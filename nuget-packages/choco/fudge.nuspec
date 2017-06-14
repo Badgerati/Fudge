@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Do not remove this test for UTF-8: if “Ω” doesn’t appear as greek uppercase omega letter enclosed in quotation marks, you should use an editor that supports UTF-8, not this one. -->
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>fudge</id>
+    <title>Fudge</title>
+    <version>$version$</version>
+    <authors>Badgerati</authors>
+    <owners>Badgerati</owners>
+    <summary>Fudge is a PowerShell tool to help manage software packages via Chocolatey for specific development projects. Think NPM and Bower, but for Chocolatey</summary>
+    <description>
+Fudge is a PowerShell tool to help manage software packages via Chocolatey for specific development projects. Think NPM and Bower, but for Chocolatey.
+
+### Features
+
+* Uses a Fudgefile to control required software
+* Allows you to version control required software to run websites, services and applications
+* Ability to run pre/post install/upgrade/uninstall scripts
+* Can seperate out developer specific software which aren't needed for certain environments
+    </description>
+    <projectUrl>https://github.com/Badgerati/Fudge</projectUrl>
+    <packageSourceUrl>https://github.com/Badgerati/Fudge/tree/master/nuget-packages</packageSourceUrl>
+    <docsUrl>https://github.com/Badgerati/Fudge/wiki</docsUrl>
+    <bugTrackerUrl>https://github.com/Badgerati/Fudge/issues</bugTrackerUrl>
+    <tags>fudge powershell automation provision devops json windows choco chocolatey software</tags>
+    <copyright>Copyright 2017</copyright>
+    <licenseUrl>https://github.com/Badgerati/Fudge/blob/master/LICENSE.txt</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <iconUrl>https://cdn.rawgit.com/Badgerati/Fudge/master/images/icon.png</iconUrl>
+    <releaseNotes>https://github.com/Badgerati/Fudge/releases</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

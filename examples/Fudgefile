@@ -1,0 +1,20 @@
+{
+    "scripts": {
+        "pre": {
+            "install": "Write-Host 'Pre-Installing'",
+            "upgrade": "Write-Host 'Pre-Upgrading'",
+            "uninstall": "Write-Host 'Pre-Uninstalling'"
+        },
+        "post": {
+            "install": "Write-Host 'Post-Installing'",
+            "upgrade": "Write-Host 'Post-Upgrading'",
+            "uninstall": "Write-Host 'Post-Uninstalling'"
+        }
+    },
+    "packages": {
+        "curl": "latest"
+    },
+    "devPackages": {
+        "markdownpad2": "latest"
+    }
+}
