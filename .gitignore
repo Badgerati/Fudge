@@ -19,6 +19,10 @@ bld/
 [Bb]in/
 [Oo]bj/
 
+# Packing Artifacts
+*.zip
+[Pp]ackage/
+
 # Vagrant
 .vagrant/
 *.box

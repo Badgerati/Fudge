@@ -1,0 +1,14 @@
+{
+    "scripts": {
+        "pre": {
+            "pack": "./pack.ps1"
+        }
+    },
+    "packages": {
+        "checksum": "latest",
+        "7zip.install": "latest"
+    },
+    "pack": {
+        "fudge": "./nuget-packages/choco/fudge.nuspec"
+    }
+}

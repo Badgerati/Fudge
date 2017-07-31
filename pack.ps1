@@ -73,11 +73,10 @@ Push-Location "./nuget-packages/choco"
 try
 {
     (Get-Content 'fudge.nuspec') | ForEach-Object { $_ -replace '\$version\$', $build_version } | Set-Content 'fudge.nuspec'
-    cd tools
+    Set-Location tools
     (Get-Content 'ChocolateyInstall.ps1') | ForEach-Object { $_ -replace '\$version\$', $build_version } | Set-Content 'ChocolateyInstall.ps1'
     (Get-Content 'Chocolateyinstall.ps1') | ForEach-Object { $_ -replace '\$checksum\$', $checksum } | Set-Content 'Chocolateyinstall.ps1'
-    cd ..
-    choco pack
+    Set-Location ..
 }
 finally
 {

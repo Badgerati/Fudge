@@ -3,12 +3,14 @@
         "pre": {
             "install": "Write-Host 'Pre-Installing'",
             "upgrade": "Write-Host 'Pre-Upgrading'",
-            "uninstall": "Write-Host 'Pre-Uninstalling'"
+            "uninstall": "Write-Host 'Pre-Uninstalling'",
+            "pack": "Write-Host 'Pre-Packing'"
         },
         "post": {
             "install": "Write-Host 'Post-Installing'",
             "upgrade": "Write-Host 'Post-Upgrading'",
-            "uninstall": "Write-Host 'Post-Uninstalling'"
+            "uninstall": "Write-Host 'Post-Uninstalling'",
+            "pack": "Write-Host 'Post-Packing'"
         }
     },
     "packages": {
@@ -16,5 +18,9 @@
     },
     "devPackages": {
         "markdownpad2": "latest"
+    },
+    "pack": {
+        "website": "./nuspecs/website.nuspec",
+        "service": "./nuspecs/service.nuspec"
     }
 }

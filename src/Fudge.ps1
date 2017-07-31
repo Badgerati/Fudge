@@ -7,10 +7,12 @@
         This is done via a Fudgefile which allows you to specify packages (and their versions) to install. You can also
         specify dev-specific packages (like git, or fiddler)
 
-        You can also define pre/post install/upgrade/uninstall scripts for additional functionality that may be required
+        You are also able to define pre/post install/upgrade/uninstall scripts for additional required functionality
+
+        Furthermore, Fudge has a section to allow you to specify multiple nuspec files and pack the one you need
     
     .PARAMETER Action
-        The action that Fudge should take: install, upgrade, uninstall
+        The action that Fudge should take: install, upgrade, uninstall, reinstall, pack
     
     .PARAMETER FudgefilePath
         This will override looking for a default 'Fudgefile' at the root of the current path, and allow you to specify
@@ -24,10 +26,16 @@
 
     .EXAMPLE
         fudge upgrade -Dev
+    
+    .EXAMPLE
+        fudge pack website
 #>
 param (
     [string]
     $Action,
+
+    [string]
+    $Key,
     
     [string]
     $FudgefilePath,
@@ -112,10 +120,44 @@ function Start-ActionPackages
         return
     }
 
-    foreach ($key in $Packages.psobject.properties.name)
+    foreach ($name in $Packages.psobject.properties.name)
     {
-        Invoke-Chocolatey -Action $Action -Package $key -Version ($Packages.$key)
+        if (![string]::IsNullOrWhiteSpace($Key) -and $name -ine $Key)
+        {
+            continue
+        }
+
+        Invoke-Chocolatey -Action $Action -Package $name -Version ($Packages.$name)
     }
+}
+
+# invokes a chocolatey action, which also runs the pre/post scripts
+function Invoke-ChocolateyAction
+{
+    param (
+        $Action,
+        $Config
+    )
+
+    # invoke pre-script for current action
+    Invoke-Script -Action $Action -Stage 'pre' -Scripts $Config.scripts
+
+    # invoke chocolatey based on the action
+    if ($Action -ieq 'pack')
+    {
+        Start-ActionPackages -Action $Action -Packages $Config.pack
+    }
+    else
+    {
+        Start-ActionPackages -Action $Action -Packages $Config.packages
+        if ($Dev)
+        {
+            Start-ActionPackages -Action $Action -Packages $Config.devPackages
+        }
+    }
+    
+    # invoke post-script for current action
+    Invoke-Script -Action $Action -Stage 'post' -Scripts $Config.scripts
 }
 
 # invoke scripts for pre/post actions
@@ -140,7 +182,7 @@ function Invoke-Script
     }
 
     # run the script
-    powershell.exe /C $script
+    Invoke-Expression -Command $script
 }
 
 # invoke chocolate for the specific action
@@ -163,12 +205,12 @@ function Invoke-Chocolatey
             {
                 if ([string]::IsNullOrWhiteSpace($Version) -or $Version -ieq 'latest')
                 {
-                    Write-Host "> Installing $($Package)" -ForegroundColor Green
+                    Write-Host "> Installing $($Package) (latest)" -ForegroundColor Magenta
                     choco install $Package -y | Out-Null
                 }
                 else
                 {
-                    Write-Host "> Installing $($Package) v$($Version)" -ForegroundColor Green
+                    Write-Host "> Installing $($Package) v$($Version)" -ForegroundColor Magenta
                     choco install $Package --version $Version -y | Out-Null
                 }
             }
@@ -177,7 +219,7 @@ function Invoke-Chocolatey
             {
                 if ([string]::IsNullOrWhiteSpace($Version) -or $Version -ieq 'latest')
                 {
-                    Write-Host "> Upgrading $($Package)" -ForegroundColor Magenta
+                    Write-Host "> Upgrading $($Package) to latest" -ForegroundColor Magenta
                     choco upgrade $Package -y | Out-Null
                 }
                 else
@@ -189,8 +231,25 @@ function Invoke-Chocolatey
 
         'uninstall'
             {
-                Write-Host "> Uninstalling $($Package)" -ForegroundColor Yellow
+                Write-Host "> Uninstalling $($Package)" -ForegroundColor Magenta
                 choco uninstall $Package -y -x | Out-Null
+            }
+
+        'pack'
+            {
+                Write-Host "> Packing $($Package)" -ForegroundColor Magenta
+                $path = Split-Path -Parent -Path $Version
+                $name = Split-Path -Leaf -Path $Version
+
+                try
+                {
+                    Push-Location $path
+                    choco pack $name | Out-Null
+                }
+                finally
+                {
+                    Pop-Location
+                }
             }
     }
 
@@ -198,6 +257,8 @@ function Invoke-Chocolatey
     {
         throw "Failed to $($Action) package: $($Package)"
     }
+
+    Write-Host "$("$($Action)ed" -ireplace 'eed$', 'ed')" -ForegroundColor Green
 }
 
 
@@ -219,7 +280,7 @@ try
 
 
     # ensure we have a valid action
-    $actions = @('install', 'upgrade', 'uninstall')
+    $actions = @('install', 'upgrade', 'uninstall', 'reinstall', 'pack')
     if ((Test-Empty $Action) -or $actions -inotcontains $Action)
     {
         Write-Host "Unrecognised action supplied '$($Action)', should be either: $($actions -join ', ')" -ForegroundColor Red
@@ -257,11 +318,28 @@ try
     }
 
 
-    # if there are no packages, just return
-    if ((Test-Empty $config.packages) -and (!$Dev -or ($Dev -and (Test-Empty $config.devPackages))))
+    # if there are no packages to install or pack, just return
+    if ($Action -ieq 'pack')
     {
-        Write-Warning "There are no packages to $($Action)"
-        return
+        if (Test-Empty $config.pack)
+        {
+            Write-Warning 'There are no nuspecs to pack'
+            return
+        }
+
+        if (![string]::IsNullOrWhiteSpace($Key) -and [string]::IsNullOrWhiteSpace($config.pack.$Key))
+        {
+            Write-Warning "Fudgefile does not contain a nuspec pack file for '$($Key)'"
+            return
+        }
+    }
+    else
+    {
+        if ((Test-Empty $config.packages) -and (!$Dev -or ($Dev -and (Test-Empty $config.devPackages))))
+        {
+            Write-Warning "There are no packages to $($Action)"
+            return
+        }
     }
 
 
@@ -289,21 +367,26 @@ try
         Write-Host "Chocolatey installed" -ForegroundColor Green
     }
 
-    
-    # invoke pre-script for current action
-    Invoke-Script -Action $Action -Stage 'pre' -Scripts $config.scripts
 
-
-    # invoke chocolatey based on the action
-    Start-ActionPackages -Action $Action -Packages $config.packages
-    if ($Dev)
+    # invoke chocolatey based on the action required
+    switch ($Action)
     {
-        Start-ActionPackages -Action $Action -Packages $config.devPackages
-    }
+        {($_ -ieq 'install') -or ($_ -ieq 'uninstall') -or ($_ -ieq 'upgrade')}
+            {
+                Invoke-ChocolateyAction -Action $Action -Config $config
+            }
+        
+        {($_ -ieq 'reinstall')}
+            {
+                Invoke-ChocolateyAction -Action 'uninstall' -Config $config
+                Invoke-ChocolateyAction -Action 'install' -Config $config
+            }
 
-    
-    # invoke post-script for current action
-    Invoke-Script -Action $Action -Stage 'post' -Scripts $config.scripts
+        {($_ -ieq 'pack')}
+            {
+                Invoke-ChocolateyAction -Action 'pack' -Config $config
+            }
+    }
 }
 finally
 {
