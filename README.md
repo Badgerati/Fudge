@@ -5,11 +5,11 @@
 
 Fudge is a PowerShell tool to help manage software packages via Chocolatey for specific development projects. Think NPM and Bower, but for Chocolatey.
 
-Fudge is in Beta, so there may be bugs; any bugs/features should be raised in the GitHub issues tab.
+If you find any bugs, or have any feature requests, please raise them in the GitHub issues tab.
 
 ## Installing
 
-[Fudge](https://chocolatey.org/packages/fudge) can be installed via Chocolatey soon (and via NuGet soon also).
+[Fudge](https://chocolatey.org/packages/fudge) can be installed via Chocolatey soon.
 
 ## Features
 
@@ -17,7 +17,8 @@ Fudge is in Beta, so there may be bugs; any bugs/features should be raised in th
 * Allows you to version control required software to run websites, services and applications
 * Ability to run pre/post install/upgrade/uninstall/pack scripts
 * Can seperate out developer specific software which aren't needed for certain environments
-* Allows you to have mutliple nuspecs, which you can then pack one or all of with Fugde
+* You can reinstall all packages, or just in/un/reinstall all packages
+* Allows you to have mutliple nuspecs, which you can then pack one or all of with Fudge
 
 ## Description
 
@@ -124,6 +125,13 @@ To specify a path to a Fudgefile:
 ```powershell
 fudge upgrade -FudgefilePath '.\path\SomeFudgeFile'
 ```
+
+## Todo
+
+* Advanced search feature
+* Add feature to add packages to the Fudgefile from the CLI
+* `-DevOnly` flag, to only deal with `devPackages`
+* Make `upgrade` install packages that are not yet installed from the Fudgefile
 
 ## Bugs and Feature Requests
 
