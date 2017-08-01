@@ -24,7 +24,7 @@ Fudge is a PowerShell tool to help manage software packages via Chocolatey for s
     <packageSourceUrl>https://github.com/Badgerati/Fudge/tree/master/nuget-packages</packageSourceUrl>
     <docsUrl>https://github.com/Badgerati/Fudge</docsUrl>
     <bugTrackerUrl>https://github.com/Badgerati/Fudge/issues</bugTrackerUrl>
-    <tags>fudge powershell automation provision devops json windows choco chocolatey software deployment</tags>
+    <tags>fudge powershell automation provision devops json windows software deployment</tags>
     <copyright>Copyright 2017</copyright>
     <licenseUrl>https://github.com/Badgerati/Fudge/blob/master/LICENSE.txt</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
