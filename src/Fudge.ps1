@@ -27,6 +27,10 @@
     .PARAMETER Dev
         Switch parameter, if supplied will also action upon the devPackages in the Fudgefile
         [Alias: -d]
+
+    .PARAMETER DevOnly
+        Switch parameter, if supplied will only action upon the devPackages in the Fudgefile
+        [Alias: -do]
     
     .PARAMETER Version
         Switch parameter, if supplied will just display the current version of Fudge installed
@@ -36,7 +40,10 @@
         fudge install
 
     .EXAMPLE
-        fudge upgrade -d
+        fudge upgrade -d    # to also upgrade devPackages
+
+    .EXAMPLE
+        fudge install -do   # to only install devPackages
     
     .EXAMPLE
         fudge pack website
@@ -60,6 +67,10 @@ param (
     [Alias('d')]
     [switch]
     $Dev,
+
+    [Alias('do')]
+    [switch]
+    $DevOnly,
 
     [Alias('v')]
     [switch]
@@ -131,6 +142,13 @@ try
     }
 
 
+    # if -devOnly is passed, set -dev to true
+    if ($DevOnly)
+    {
+        $Dev = $true
+    }
+
+
     # if there are no packages to install or pack, just return
     if ($Action -ieq 'pack')
     {
@@ -151,6 +169,12 @@ try
         if ((Test-Empty $config.packages) -and (!$Dev -or ($Dev -and (Test-Empty $config.devPackages))))
         {
             Write-Warning "There are no packages to $($Action)"
+            return
+        }
+
+        if ($DevOnly -and (Test-Empty $config.devPackages))
+        {
+            Write-Warning "There are no devPackages to $($Action)"
             return
         }
     }
@@ -191,24 +215,24 @@ try
     {
         {($_ -ieq 'install') -or ($_ -ieq 'uninstall') -or ($_ -ieq 'upgrade')}
             {
-                Invoke-ChocolateyAction -Action $Action -Key $Key -Config $config -Dev:$Dev
+                Invoke-ChocolateyAction -Action $Action -Key $Key -Config $config -Dev:$Dev -DevOnly:$DevOnly
             }
         
         {($_ -ieq 'reinstall')}
             {
-                Invoke-ChocolateyAction -Action 'uninstall' -Key $Key -Config $config -Dev:$Dev
-                Invoke-ChocolateyAction -Action 'install' -Key $Key -Config $config -Dev:$Dev
+                Invoke-ChocolateyAction -Action 'uninstall' -Key $Key -Config $config -Dev:$Dev -DevOnly:$DevOnly
+                Invoke-ChocolateyAction -Action 'install' -Key $Key -Config $config -Dev:$Dev -DevOnly:$DevOnly
             }
 
         {($_ -ieq 'pack')}
             {
-                Invoke-ChocolateyAction -Action 'pack' -Key $Key -Config $config -Dev:$Dev
+                Invoke-ChocolateyAction -Action 'pack' -Key $Key -Config $config
             }
 
         {($_ -ieq 'list')}
             {
                 $localList = Get-ChocolateyLocalList
-                Invoke-FudgeLocalDetails -Config $config -Key $Key -LocalList $localList -Dev:$Dev
+                Invoke-FudgeLocalDetails -Config $config -Key $Key -LocalList $localList -Dev:$Dev -DevOnly:$DevOnly
             }
     }
 }
