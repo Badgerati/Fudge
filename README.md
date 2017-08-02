@@ -102,7 +102,8 @@ fudge list          # list information about packages in the Fudgefile
 * To install developer only packages (also works with upgrade/uninstall/reinstall):
 
 ```powershell
-fudge install -dev
+fudge install -dev      # this will install from packages and devPackages
+fudge install -devOnly  # this will only install from the devPackages
 ```
 
 * To only install one of the packages in the Fudgefile (also works with upgrade/uninstall/reinstall):

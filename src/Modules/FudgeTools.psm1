@@ -194,7 +194,10 @@ function Invoke-ChocolateyAction
         $Config,
 
         [switch]
-        $Dev
+        $Dev,
+
+        [switch]
+        $DevOnly
     )
 
     # invoke pre-script for current action
@@ -207,7 +210,11 @@ function Invoke-ChocolateyAction
     }
     else
     {
-        Start-ActionPackages -Action $Action -Packages $Config.packages
+        if (!$DevOnly)
+        {
+            Start-ActionPackages -Action $Action -Packages $Config.packages
+        }
+
         if ($Dev)
         {
             Start-ActionPackages -Action $Action -Packages $Config.devPackages
@@ -253,7 +260,10 @@ function Invoke-FudgeLocalDetails
         $LocalList,
 
         [switch]
-        $Dev
+        $Dev,
+
+        [switch]
+        $DevOnly
     )
 
     # maps for filtering packages
@@ -263,7 +273,12 @@ function Invoke-FudgeLocalDetails
 
     # package map
     $packages = @{}
-    $Config.packages.psobject.properties.name | ForEach-Object { $packages[$_] = $Config.packages.$_ }
+
+    if (!$DevOnly)
+    {
+        $Config.packages.psobject.properties.name | ForEach-Object { $packages[$_] = $Config.packages.$_ }
+    }
+
     if ($Dev)
     {
         $Config.devPackages.psobject.properties.name | ForEach-Object { $packages[$_] = $Config.devPackages.$_ }
