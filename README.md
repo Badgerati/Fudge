@@ -7,7 +7,14 @@ Fudge is a PowerShell tool to help manage software packages via Chocolatey for s
 
 If you find any bugs, or have any feature requests, please raise them in the GitHub issues tab.
 
-## Installing
+* [Installing Fudge](#installing-fudge)
+* [Features](#features)
+* [Description](#description)
+* [Example Fudgefile](#example-fudgefile)
+* [Example Calls](#example-calls)
+* [Bugs and Feature Requests](#bugs-and-feature-requests)
+
+## Installing Fudge
 
 [Fudge](https://chocolatey.org/packages/fudge) can be installed via Chocolatey soon.
 
@@ -19,6 +26,7 @@ If you find any bugs, or have any feature requests, please raise them in the Git
 * Can seperate out developer specific software which aren't needed for certain environments
 * You can reinstall all packages, or just in/un/reinstall all packages
 * Allows you to have mutliple nuspecs, which you can then pack one or all of with Fudge
+* See details about packages in a Fudgefile - such as which ones are installed or need upgrading
 
 ## Description
 
@@ -75,52 +83,50 @@ And that's it!
 | ---- | ----------- |
 | scripts | The `scripts` section is optional. Scripts can either be direct PowerShell command like `"Write-Host 'hello, world!'"`, or a path to a PowerShell script |
 | packages | These are the main packages that will be installed, upgraded or uninstalled |
-| devPackages | These packages will only be touched if the `-Dev` switch is specified on the CLI |
+| devPackages | These packages will only be touched if the `-dev` switch is specified on the CLI |
 | pack | This is a key-value map of paths to nuspecs files that can be packed via Chocolatey |
 
-## Example Call
+## Example Calls
 
 A normal call to Fudge will look as follows, assuming there's a Fudgefile at the current path:
 
 ```powershell
-fudge install
-fudge upgrade
-fudge uninstall
-fudge reinstall
-fudge pack
+fudge install       # install one or all packages (one if a package_id is passed)
+fudge upgrade       # upgrade one or all packages
+fudge uninstall     # uninstall one or all packages
+fudge reinstall     # reinstall one or all packages
+fudge pack          # pack one or all nuspec files
+fudge list          # list information about packages in the Fudgefile
 ```
 
-To also install developer only packages:
+* To install developer only packages (also works with upgrade/uninstall/reinstall):
 
 ```powershell
-fudge install -Dev
+fudge install -dev
 ```
 
-To reinstall all packages:
-
-```powershell
-fudge reinstall
-```
-
-To only install one of the packages in the Fudgefile (also works with upgrade/uninstall/reinstall):
+* To only install one of the packages in the Fudgefile (also works with upgrade/uninstall/reinstall):
 
 ```powershell
 fudge install 7zip.install
 ```
 
-To pack all of your nuspec files:
+* To pack one or all of your nuspec files:
 
 ```powershell
 fudge pack
-```
-
-To only pack one of your nuspec files:
-
-```powershell
 fudge pack website
 ```
 
-To specify a path to a Fudgefile:
+* To list information about packages in the Fudgefile (such as are they installed, etc):
+
+```powershell
+fudge list
+fudge list checksum
+fudge list -dev
+```
+
+* To specify a path to a Fudgefile:
 
 ```powershell
 fudge upgrade -FudgefilePath '.\path\SomeFudgeFile'
