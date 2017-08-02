@@ -12,7 +12,7 @@
         Furthermore, Fudge has a section to allow you to specify multiple nuspec files and pack the one you need
     
     .PARAMETER Action
-        The action that Fudge should take: install, upgrade, uninstall, reinstall, pack
+        The action that Fudge should undertake: install, upgrade, uninstall, reinstall, pack, list
         [Alias: -a]
 
     .PARAMETER Key
