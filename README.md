@@ -95,8 +95,9 @@ fudge install       # install one or all packages (one if a package_id is passed
 fudge upgrade       # upgrade one or all packages
 fudge uninstall     # uninstall one or all packages
 fudge reinstall     # reinstall one or all packages
-fudge pack          # pack one or all nuspec files
+fudge pack <id>     # pack one or all nuspec files
 fudge list          # list information about packages in the Fudgefile
+fudge search <id>   # search chocolatey for packages, but results are sorted
 ```
 
 * To install developer only packages (also works with upgrade/uninstall/reinstall):
@@ -127,6 +128,13 @@ fudge list checksum
 fudge list -dev
 ```
 
+* To search chocolatey for packages. The results returned are sorted so what you're looking for will be at (or close to) the top
+
+```powershell
+fudge search checksum
+fudge search git -l 20  # -l limits the results displayed, default is 10 (0 is everything)
+```
+
 * To specify a path to a Fudgefile:
 
 ```powershell
@@ -135,10 +143,9 @@ fudge upgrade -FudgefilePath '.\path\SomeFudgeFile'
 
 ## Todo
 
-* Advanced search feature
-* Add feature to add packages to the Fudgefile from the CLI
-* `-DevOnly` flag, to only deal with `devPackages`
-* Make `upgrade` install packages that are not yet installed from the Fudgefile
+* Add feature to create new empty Fudgefile, or one from a nuspec
+* Add feature to add packages to the Fudgefile from the CLI (or from a nuspec)
+* Add feature to refresh a Fudgefile using the nuspecs
 
 ## Bugs and Feature Requests
 
