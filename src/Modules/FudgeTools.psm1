@@ -5,10 +5,13 @@ function Write-Success
         [Parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
         [string]
-        $Message
+        $Message,
+
+        [switch]
+        $NoNewLine
     )
 
-    Write-Host $Message -ForegroundColor Green
+    Write-Host $Message -NoNewline:$NoNewLine -ForegroundColor Green
 }
 
 function Write-Information
@@ -17,10 +20,13 @@ function Write-Information
         [Parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
         [string]
-        $Message
+        $Message,
+
+        [switch]
+        $NoNewLine
     )
 
-    Write-Host $Message -ForegroundColor Magenta
+    Write-Host $Message -NoNewline:$NoNewLine -ForegroundColor Magenta
 }
 
 
@@ -30,10 +36,13 @@ function Write-Details
         [Parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
         [string]
-        $Message
+        $Message,
+
+        [switch]
+        $NoNewLine
     )
 
-    Write-Host $Message -ForegroundColor Cyan
+    Write-Host $Message -NoNewline:$NoNewLine -ForegroundColor Cyan
 }
 
 
@@ -43,10 +52,13 @@ function Write-Notice
         [Parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
         [string]
-        $Message
+        $Message,
+
+        [switch]
+        $NoNewLine
     )
 
-    Write-Host $Message -ForegroundColor Yellow
+    Write-Host $Message -NoNewline:$NoNewLine -ForegroundColor Yellow
 }
 
 
@@ -56,10 +68,108 @@ function Write-Fail
         [Parameter(Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
         [string]
-        $Message
+        $Message,
+
+        [switch]
+        $NoNewLine
     )
 
-    Write-Host $Message -ForegroundColor Red
+    Write-Host $Message -NoNewline:$NoNewLine -ForegroundColor Red
+}
+
+
+# returns the levenshtein distance between two strings
+function Get-Levenshtein
+{
+    param (
+        [string]
+        $Value1,
+
+        [string]
+        $Value2
+    )
+
+    $len1 = $Value1.Length
+    $len2 = $Value2.Length
+
+    if ($len1 -eq 0) { return $len2 }
+    if ($len2 -eq 0) { return $len1 }
+
+    $Value1 = $Value1.ToLowerInvariant()
+    $Value2 = $Value2.ToLowerInvariant()
+
+    $dist = New-Object -Type 'int[,]' -Arg ($len1 + 1), ($len2 + 1)
+
+    0..$len1 | ForEach-Object { $dist[$_, 0] = $_ }
+    0..$len2 | ForEach-Object { $dist[0, $_] = $_ }
+
+    $cost = 0
+
+    for ($i = 1; $i -le $len1; $i++)
+    {
+        for ($j = 1; $j -le $len2; $j++)
+        {
+            $cost = 1
+            if ($Value2[$j - 1] -ceq $Value1[$i - 1])
+            {
+                $cost = 0
+            }
+            
+            $tempmin = [System.Math]::Min(([int]$dist[($i - 1), $j] + 1), ([int]$dist[$i, ($j - 1)] + 1))
+            $dist[$i, $j] = [System.Math]::Min($tempmin, ([int]$dist[($i - 1), ($j - 1)] + $cost))
+        }
+    }
+    
+    # the actual distance is stored in the bottom right cell
+    return $dist[$len1, $len2];
+}
+
+
+# checks to see if the fudgefile exists, and returns a valid path
+function Test-Fudgefile
+{
+    param (
+        [string]
+        $FudgefilePath
+    )
+
+    $path = './Fudgefile'
+    if (![string]::IsNullOrWhiteSpace($FudgefilePath))
+    {
+        if ((Get-Item $FudgefilePath) -is [System.IO.DirectoryInfo])
+        {
+            $path = Join-Path $FudgefilePath 'Fudgefile'
+        }
+        else
+        {
+            $path = $FudgefilePath
+        }
+    }
+
+    if (!(Test-Path $path))
+    {
+        throw "Path to Fudgefile does not exist at: $($path)"
+    }
+
+    return $path
+}
+
+
+# returns the content of a passed fudgefile
+function Get-Fudgefile
+{
+    param (
+        [string]
+        $FudgefilePath
+    )
+
+    $config = Get-Content -Path $FudgefilePath -Raw | ConvertFrom-Json
+    if (!$?)
+    {
+        throw "Failed to parse the Fudgefile at: $($FudgefilePath)"
+    }
+
+    return $config
 }
 
 
@@ -118,6 +228,38 @@ function Test-Empty
     }
 
     return ([string]::IsNullOrWhiteSpace($Value) -or ($Value | Measure-Object).Count -eq 0 -or $Value.Count -eq 0)
+}
+
+
+# check to see if chocolatey is installed on the current machine
+function Test-Chocolatey
+{
+    $output = powershell.exe /C "choco -v"
+    $success = ($LASTEXITCODE -eq 0)
+
+    if ($success)
+    {
+        Write-Details "Chocolatey v$($output)`n"
+    }
+
+    return $success
+}
+
+
+# installs chocolatey
+function Install-Chocolatey
+{
+    Write-Notice "Installing Chocolatey"
+
+    $policies = @('Unrestricted', 'ByPass', 'AllSigned')
+    if ($policies -inotcontains (Get-ExecutionPolicy))
+    {
+        Set-ExecutionPolicy  Bypass -Force
+    }
+
+    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')) | Out-Null
+
+    Write-Success "Chocolatey installed`n"
 }
 
 
@@ -226,25 +368,161 @@ function Invoke-ChocolateyAction
 }
 
 
+# returns the list of search returns from chocolatey
+function Get-ChocolateySearchList
+{
+    param (
+        [string]
+        $Key
+    )
+
+    $list = (choco search $Key)
+    if (!$?)
+    {
+        Write-Fail "$($list)"
+        throw 'Failed to retrieve search results from Chocolatey'
+    }
+
+    return (Format-ChocolateyList -List $list)
+}
+
+
 # returns a list of packages installed localled
 function Get-ChocolateyLocalList
 {
-    $map = @{}
-    
-    $list = (choco list -lo | Select-Object -Skip 1 | Select-Object -SkipLast 1)
+    $list = (choco list -lo)
     if (!$?)
     {
+        Write-Fail "$($list)"
         throw 'Failed to retrieve local list of installed packages'
     }
 
-    $list | ForEach-Object {
-        if ($_ -imatch '^(?<name>.*?)\s+(?<version>[\d\.]+)$')
+    return (Format-ChocolateyList -List $list)
+}
+
+
+# formats list/search results from chocolatey into a hash table
+function Format-ChocolateyList
+{
+    param (
+        [string[]]
+        $List
+    )
+
+    $map = @{}
+
+    $List | ForEach-Object {
+        $row = $_ -ireplace ' Downloads cached for licensed users', ''
+        if ($row -imatch '^(?<name>.*?)\s+(?<version>[\d\.]+(\s+\[Approved\]){0,1}(\s+-\s+Possibly broken){0,1}).*?$')
         {
             $map[$Matches['name']] = $Matches['version']
         }
     }
 
     return $map
+}
+
+
+# invokes fudge to search chocolatey for a package and display the results
+function Invoke-Search
+{
+    param (
+        [string]
+        $Key,
+
+        [int]
+        $Limit
+    )
+
+    # basic validation on key and limit
+    if ([string]::IsNullOrWhiteSpace($Key))
+    {
+        Write-Notice 'No search key provided'
+        return
+    }
+
+    if ($Limit -lt 0)
+    {
+        Write-Notice "Limit for searching must be 0 or greater, found: $($Limit)"
+        return
+    }
+
+    # get search results from chocolatey
+    $results = Get-ChocolateySearchList -Key $Key
+    $OrganisedResults = @()
+    $count = 0
+
+    # if limit is 0, set to total results returned
+    if ($Limit -eq 0)
+    {
+        $Limit = ($results | Measure-Object).Count
+    }
+
+    # perfect match
+    if ($results.ContainsKey($Key))
+    {
+        $count++
+        $OrganisedResults += @{'name' = $Key; 'version' = $results[$Key]; }
+        $results.Remove($Key)
+    }
+
+    # starts with (with added '.' for sub-packages)
+    if ($count -lt $Limit)
+    {
+        $results.Clone().Keys | ForEach-Object {
+            if ($_.StartsWith("$($Key)."))
+            {
+                $count++
+                $OrganisedResults += @{'name' = $_; 'version' = $results[$_]; }
+                $results.Remove($_)
+            }
+        }
+    }
+
+    # starts with
+    if ($count -lt $Limit)
+    {
+        $results.Clone().Keys | ForEach-Object {
+            if ($_.StartsWith($Key))
+            {
+                $count++
+                $OrganisedResults += @{'name' = $_; 'version' = $results[$_]; }
+                $results.Remove($_)
+            }
+        }
+    }
+
+    # contains
+    if ($count -lt $Limit)
+    {
+        $results.Clone().Keys | ForEach-Object {
+            if ($_.Contains($Key))
+            {
+                $count++
+                $OrganisedResults += @{'name' = $_; 'version' = $results[$_]; }
+                $results.Remove($_)
+            }
+        }
+    }
+
+    # levenshtein
+    if ($count -lt $Limit)
+    {
+        $leven = @()
+
+        $results.Keys | ForEach-Object {
+            $leven += @{'name' = $_; 'version' = $results[$_]; 'dist' = (Get-Levenshtein $Key $_) }
+        }
+
+        $leven | Sort-Object { $_.dist } | ForEach-Object {
+            $OrganisedResults += @{'name' = $_.name; 'version' = $_.version; }
+        }
+    }
+
+    # display the search results
+    $OrganisedResults | Select-Object -First $Limit | ForEach-Object {
+        Write-Host ("{0,-30} {1,-30}" -f $_.name, $_.version)
+    }
 }
 
 
@@ -346,12 +624,12 @@ function Invoke-Chocolatey
             {
                 if ([string]::IsNullOrWhiteSpace($Version) -or $Version -ieq 'latest')
                 {
-                    Write-Information "> Installing $($Package) (latest)"
+                    Write-Information "> Installing $($Package) (latest)" -NoNewLine
                     choco install $Package -y | Out-Null
                 }
                 else
                 {
-                    Write-Information "> Installing $($Package) v$($Version)"
+                    Write-Information "> Installing $($Package) v$($Version)" -NoNewLine
                     choco install $Package --version $Version -y | Out-Null
                 }
             }
@@ -360,25 +638,25 @@ function Invoke-Chocolatey
             {
                 if ([string]::IsNullOrWhiteSpace($Version) -or $Version -ieq 'latest')
                 {
-                    Write-Information "> Upgrading $($Package) to latest"
+                    Write-Information "> Upgrading $($Package) to latest" -NoNewLine
                     choco upgrade $Package -y | Out-Null
                 }
                 else
                 {
-                    Write-Information "> Upgrading $($Package) to v$($Version)"
+                    Write-Information "> Upgrading $($Package) to v$($Version)" -NoNewLine
                     choco upgrade $Package --version $Version -y | Out-Null
                 }
             }
 
         'uninstall'
             {
-                Write-Information "> Uninstalling $($Package)"
+                Write-Information "> Uninstalling $($Package)" -NoNewLine
                 choco uninstall $Package -y -x | Out-Null
             }
 
         'pack'
             {
-                Write-Information "> Packing $($Package)"
+                Write-Information "> Packing $($Package)" -NoNewLine
                 $path = Split-Path -Parent -Path $Version
                 $name = Split-Path -Leaf -Path $Version
 
@@ -399,5 +677,5 @@ function Invoke-Chocolatey
         throw "Failed to $($Action) package: $($Package)"
     }
 
-    Write-Success "$("$($Action)ed" -ireplace 'eed$', 'ed')"
+    Write-Success " > $("$($Action)ed" -ireplace 'eed$', 'ed')"
 }

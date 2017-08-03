@@ -12,7 +12,8 @@
         Furthermore, Fudge has a section to allow you to specify multiple nuspec files and pack the one you need
     
     .PARAMETER Action
-        The action that Fudge should undertake: install, upgrade, uninstall, reinstall, pack, list
+        The action that Fudge should undertake
+        Actions: install, upgrade, uninstall, reinstall, pack, list, search
         [Alias: -a]
 
     .PARAMETER Key
@@ -23,6 +24,12 @@
         This will override looking for a default 'Fudgefile' at the root of the current path, and allow you to specify
         other files instead. This allows you to have multiple Fudgefiles
         [Alias: -fp]
+
+    .PARAMETER Limit
+        This argument only applies for the 'search' action. It will limit the amount of packages returned when searching
+        If 0 is supplied, the full list is returned
+        [Default: 10]
+        [Alias: -l]
 
     .PARAMETER Dev
         Switch parameter, if supplied will also action upon the devPackages in the Fudgefile
@@ -64,6 +71,10 @@ param (
     [string]
     $FudgefilePath,
 
+    [Alias('l')]
+    [int]
+    $Limit = 10,
+
     [Alias('d')]
     [switch]
     $Dev,
@@ -88,7 +99,7 @@ Import-Module "$($root)\Modules\FudgeTools.psm1" -ErrorAction Stop
 
 # output the version
 $ver = 'v$version$'
-Write-Details "Fudge $($ver)`n"
+Write-Details "Fudge $($ver)"
 
 # if we were only after the version, just return
 if ($Version)
@@ -104,40 +115,14 @@ try
 
 
     # ensure we have a valid action
-    $actions = @('install', 'upgrade', 'uninstall', 'reinstall', 'pack', 'list')
+    $packageActions = @('install', 'upgrade', 'uninstall', 'reinstall', 'list')
+    $packingActions = @('pack')
+    $miscActions = @('search')
+    $actions = ($packageActions + $packingActions + $miscActions)
+
     if ((Test-Empty $Action) -or $actions -inotcontains $Action)
     {
         Write-Fail "Unrecognised action supplied '$($Action)', should be either: $($actions -join ', ')"
-        return
-    }
-
-
-    # ensure that the Fudgefile exists
-    $path = './Fudgefile'
-    if (![string]::IsNullOrWhiteSpace($FudgefilePath))
-    {
-        if ((Get-Item $FudgefilePath) -is [System.IO.DirectoryInfo])
-        {
-            $path = Join-Path $FudgefilePath 'Fudgefile'
-        }
-        else
-        {
-            $path = $FudgefilePath
-        }
-    }
-
-    if (!(Test-Path $path))
-    {
-        Write-Fail "Path to Fudgefile does not exist at: $($path)"
-        return
-    }
-
-
-    # deserialise the Fudgefile
-    $config = Get-Content -Path $path -Raw | ConvertFrom-Json
-    if (!$?)
-    {
-        Write-Fail "Failed to parse the Fudgefile at: $($path)"
         return
     }
 
@@ -149,64 +134,61 @@ try
     }
 
 
+    # ensure that the Fudgefile exists and deserialise it
+    if ($packageActions -icontains $Action -or $packingActions -icontains $Action)
+    {
+        $path = Test-Fudgefile $FudgefilePath
+        $config = Get-Fudgefile $path
+    }
+
+
     # if there are no packages to install or pack, just return
-    if ($Action -ieq 'pack')
+    if ($packingActions -icontains $Action)
     {
         if (Test-Empty $config.pack)
         {
-            Write-Warning 'There are no nuspecs to pack'
+            Write-Notice "There are no nuspecs to $($Action)"
             return
         }
 
         if (![string]::IsNullOrWhiteSpace($Key) -and [string]::IsNullOrWhiteSpace($config.pack.$Key))
         {
-            Write-Warning "Fudgefile does not contain a nuspec pack file for '$($Key)'"
+            Write-Notice "Fudgefile does not contain a nuspec pack file for '$($Key)'"
             return
         }
     }
-    else
+    elseif ($packageActions -icontains $Action)
     {
         if ((Test-Empty $config.packages) -and (!$Dev -or ($Dev -and (Test-Empty $config.devPackages))))
         {
-            Write-Warning "There are no packages to $($Action)"
+            Write-Notice "There are no packages to $($Action)"
             return
         }
 
         if ($DevOnly -and (Test-Empty $config.devPackages))
         {
-            Write-Warning "There are no devPackages to $($Action)"
+            Write-Notice "There are no devPackages to $($Action)"
             return
         }
     }
 
     # check to see if chocolatey is installed
-    powershell.exe /C "choco -v" | Out-Null
-    $isChocoInstalled = ($LASTEXITCODE -eq 0)
+    $isChocoInstalled = Test-Chocolatey
 
 
     # check if the console is elevated (only needs to be done for certain actions)
-    if ((!$isChocoInstalled -or @('list') -inotcontains $Action) -and !(Test-AdminUser))
+    if ((!$isChocoInstalled -or @('list', 'search') -inotcontains $Action) -and !(Test-AdminUser))
     {
-        Write-Warning 'Must be running with administrator priviledges for Fudge to fully function'
+        Write-Notice 'Must be running with administrator priviledges for Fudge to fully function'
         return
     }
 
 
-    # check to see if chocolatey is installed - else install it
+    # if chocolatey isn't installed, install it
     if (!$isChocoInstalled)
     {
-        Write-Notice "Installing Chocolatey"
-
-        $policies = @('Unrestricted', 'ByPass', 'AllSigned')
-        if ($policies -inotcontains (Get-ExecutionPolicy))
-        {
-            Set-ExecutionPolicy  Bypass -Force
-        }
-
-        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')) | Out-Null
+        Install-Chocolatey
         $isChocoInstalled = $true
-
-        Write-Success "Chocolatey installed`n"
     }
 
 
@@ -233,6 +215,11 @@ try
             {
                 $localList = Get-ChocolateyLocalList
                 Invoke-FudgeLocalDetails -Config $config -Key $Key -LocalList $localList -Dev:$Dev -DevOnly:$DevOnly
+            }
+
+        {($_ -ieq 'search')}
+            {
+                Invoke-Search -Key $Key -Limit $Limit
             }
     }
 }
