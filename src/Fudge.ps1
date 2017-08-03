@@ -57,6 +57,9 @@
 
     .EXAMPLE
         fudge list
+
+    .EXAMPLE
+        fudge search checksum
 #>
 param (
     [Alias('a')]
