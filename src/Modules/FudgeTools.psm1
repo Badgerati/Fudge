@@ -125,18 +125,62 @@ function Get-Levenshtein
 }
 
 
+# checks to see if a passed path is a valid nuspec file
+function Test-Nuspec
+{
+    param (
+        [string]
+        $Path
+    )
+
+    # ensure a path was passed
+    if ([string]::IsNullOrWhiteSpace($Path))
+    {
+        throw 'No path to a valid nuspec file passed'
+    }
+
+    # ensure path is exists, or is not just a directory path
+    if (!(Test-Path $Path) -or ((Get-Item $Path) -is [System.IO.DirectoryInfo]))
+    {
+        throw "Path to nuspec file doesn't exist or is invalid: $($Path)"
+    }
+
+    # ensure the content parses as xml
+    try
+    {
+        $content = [xml](Get-Content $Path)
+    }
+    catch [exception]
+    {
+        throw "Nuspec file fails to parse as a valid XML document: $($Path)"
+    }
+
+    # ensure we have package and metadata tags
+    if ($content.package -eq $null -or $content.package.metadata -eq $null)
+    {
+        throw "Nuspec file is missing the package/metadata XML sections: $($Path)"
+    }
+
+    # file is valid
+    return $content
+}
+
+
 # checks to see if the fudgefile exists, and returns a valid path
 function Test-Fudgefile
 {
     param (
         [string]
-        $FudgefilePath
+        $FudgefilePath,
+
+        [switch]
+        $DoesntExist
     )
 
     $path = './Fudgefile'
     if (![string]::IsNullOrWhiteSpace($FudgefilePath))
     {
-        if ((Get-Item $FudgefilePath) -is [System.IO.DirectoryInfo])
+        if ((Test-Path $FudgefilePath) -and ((Get-Item $FudgefilePath) -is [System.IO.DirectoryInfo]))
         {
             $path = Join-Path $FudgefilePath 'Fudgefile'
         }
@@ -146,9 +190,13 @@ function Test-Fudgefile
         }
     }
 
-    if (!(Test-Path $path))
+    if (!$DoesntExist -and !(Test-Path $path))
     {
-        throw "Path to Fudgefile does not exist at: $($path)"
+        throw "Path to Fudgefile does not exist: $($path)"
+    }
+    elseif ($DoesntExist -and (Test-Path $path))
+    {
+        throw "Path to Fudgefile already exists: $($path)"
     }
 
     return $path
@@ -170,6 +218,71 @@ function Get-Fudgefile
     }
 
     return $config
+}
+
+
+# create a new empty fudgefile, or a new one from a nuspec file
+function New-Fudgefile
+{
+    param (
+        [string]
+        $Key,
+
+        [string]
+        $FudgefilePath
+    )
+
+    # if the key is passed, ensure it's a valid nuspec file
+    if (![string]::IsNullOrWhiteSpace($Key))
+    {
+        $nuspecData = Test-Nuspec $Key
+        $nuspecName = Split-Path -Leaf -Path $Key
+        Write-Information "> Creating new Fudgefile using $($nuspecName)" -NoNewLine
+    }
+    else
+    {
+        Write-Information "> Creating new Fudgefile" -NoNewLine
+    }
+
+    # setup the empty fudgefile
+    $fudge = @{
+        'scripts' = @{
+            'pre' = @{ 'install'= ''; 'uninstall'= ''; 'upgrade'= ''; 'pack'= ''; };
+            'post' = @{ 'install'= ''; 'uninstall'= ''; 'upgrade'= ''; 'pack'= ''; };
+        };
+        'packages' = @{};
+        'devPackages' = @{};
+        'pack' = @{};
+    }
+
+    # insert any data from the nuspec
+    if ($nuspecData -ne $null)
+    {
+        $meta = $nuspecData.package.metadata
+
+        # if we have any dependencies, add them as packages
+        if ($meta.dependencies -ne $null)
+        {
+            $meta.dependencies.dependency | ForEach-Object {
+                $version = 'latest'
+                if (![string]::IsNullOrWhiteSpace($_.version))
+                {
+                    $version = $_.version
+                }
+
+                $fudge.packages[$_.id] = $version
+            }
+        }
+
+        # add the nuspec as a pack that can be packed
+        $name = [System.IO.Path]::GetFileNameWithoutExtension($nuspecName)
+        $fudge.pack[$name] = $Key
+    }
+
+    # save contents as json
+    $fudge | ConvertTo-Json | Out-File -FilePath $FudgefilePath -Encoding utf8 -Force
+    Write-Success " > created"
+    Write-Details "   > $($FudgefilePath)"
 }
 
 

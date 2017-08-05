@@ -27,6 +27,7 @@ If you find any bugs, or have any feature requests, please raise them in the Git
 * You can reinstall all packages, or just in/un/reinstall all packages
 * Allows you to have mutliple nuspecs, which you can then pack one or all of with Fudge
 * See details about packages in a Fudgefile - such as which ones are installed or need upgrading
+* Create template Fudgefiles from nuspec files
 
 ## Description
 
@@ -91,13 +92,14 @@ And that's it!
 A normal call to Fudge will look as follows, assuming there's a Fudgefile at the current path:
 
 ```powershell
-fudge install       # install one or all packages (one if a package_id is passed)
-fudge upgrade       # upgrade one or all packages
-fudge uninstall     # uninstall one or all packages
-fudge reinstall     # reinstall one or all packages
-fudge pack <id>     # pack one or all nuspec files
-fudge list          # list information about packages in the Fudgefile
-fudge search <id>   # search chocolatey for packages, but results are sorted
+fudge install           # install one or all packages (one if a package_id is passed)
+fudge upgrade           # upgrade one or all packages
+fudge uninstall         # uninstall one or all packages
+fudge reinstall         # reinstall one or all packages (runs uninstall then install)
+fudge pack <id>         # pack one or all nuspec files
+fudge list              # list information about packages in the Fudgefile
+fudge search <id>       # search chocolatey for packages, but results are sorted
+fudge new <nuspec>      # create an empty Fudgefile, or a populated one from a nuspec
 ```
 
 * To install developer only packages (also works with upgrade/uninstall/reinstall):
@@ -132,7 +134,15 @@ fudge list -dev
 
 ```powershell
 fudge search checksum
-fudge search git -l 20  # -l limits the results displayed, default is 10 (0 is everything)
+fudge search git -l 20      # -l limits the results displayed, default is 10 (0 is everything)
+```
+
+* To create a new empty Fudgefile, or one from a nuspec:
+
+```powershell
+fudge new                   # creates a new empty template Fudgefile at the current path
+fudge new <nuspec_path>     # creates a new template Fudgefile, with packages/pack populated
+fudge new -fp './custom'    # creates a new Fudgefile, but with a custom name
 ```
 
 * To specify a path to a Fudgefile:
@@ -143,9 +153,8 @@ fudge upgrade -FudgefilePath '.\path\SomeFudgeFile'
 
 ## Todo
 
-* Add feature to create new empty Fudgefile, or one from a nuspec
-* Add feature to add packages to the Fudgefile from the CLI (or from a nuspec)
-* Add feature to refresh a Fudgefile using the nuspecs
+* Add feature to add/remove packages to the Fudgefile from the CLI/nuspec
+* Add feature to refresh a Fudgefile using the nuspecs in the pack section
 
 ## Bugs and Feature Requests
 

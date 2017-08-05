@@ -13,7 +13,7 @@
     
     .PARAMETER Action
         The action that Fudge should undertake
-        Actions: install, upgrade, uninstall, reinstall, pack, list, search
+        Actions: install, upgrade, uninstall, reinstall, pack, list, search, new
         [Alias: -a]
 
     .PARAMETER Key
@@ -23,6 +23,7 @@
     .PARAMETER FudgefilePath
         This will override looking for a default 'Fudgefile' at the root of the current path, and allow you to specify
         other files instead. This allows you to have multiple Fudgefiles
+        [Default: ./Fudgefile]
         [Alias: -fp]
 
     .PARAMETER Limit
@@ -121,7 +122,8 @@ try
     $packageActions = @('install', 'upgrade', 'uninstall', 'reinstall', 'list')
     $packingActions = @('pack')
     $miscActions = @('search')
-    $actions = ($packageActions + $packingActions + $miscActions)
+    $newActions = @('new')
+    $actions = ($packageActions + $packingActions + $miscActions + $newActions)
 
     if ((Test-Empty $Action) -or $actions -inotcontains $Action)
     {
@@ -137,11 +139,17 @@ try
     }
 
 
-    # ensure that the Fudgefile exists and deserialise it
+    # ensure that the Fudgefile exists (for certain actions), and deserialise it
     if ($packageActions -icontains $Action -or $packingActions -icontains $Action)
     {
-        $path = Test-Fudgefile $FudgefilePath
-        $config = Get-Fudgefile $path
+        $FudgefilePath = Test-Fudgefile $FudgefilePath
+        $config = Get-Fudgefile $FudgefilePath
+    }
+
+    # ensure that the Fudgefile doesn't exist
+    elseif ($newActions -icontains $Action)
+    {
+        $FudgefilePath = Test-Fudgefile $FudgefilePath -DoesntExist
     }
 
 
@@ -180,7 +188,7 @@ try
 
 
     # check if the console is elevated (only needs to be done for certain actions)
-    if ((!$isChocoInstalled -or @('list', 'search') -inotcontains $Action) -and !(Test-AdminUser))
+    if ((!$isChocoInstalled -or (@('list', 'search', 'new') -inotcontains $Action)) -and !(Test-AdminUser))
     {
         Write-Notice 'Must be running with administrator priviledges for Fudge to fully function'
         return
@@ -223,6 +231,11 @@ try
         {($_ -ieq 'search')}
             {
                 Invoke-Search -Key $Key -Limit $Limit
+            }
+
+        {($_ -ieq 'new')}
+            {
+                New-Fudgefile -Key $Key -FudgefilePath $FudgefilePath
             }
     }
 }
