@@ -544,7 +544,9 @@ function Invoke-Search
         $Key,
 
         [int]
-        $Limit
+        $Limit,
+
+        $LocalList
     )
 
     # basic validation on key and limit
@@ -634,7 +636,23 @@ function Invoke-Search
 
     # display the search results
     $OrganisedResults | Select-Object -First $Limit | ForEach-Object {
-        Write-Host ("{0,-30} {1,-30}" -f $_.name, $_.version)
+        if ($LocalList.ContainsKey($_.name))
+        {
+            ($_.version -imatch '^(?<version>[\d\.]+).*?$') | Out-Null
+
+            if ($Matches['version'] -eq $LocalList[$_.name])
+            {
+                Write-Success ("{0,-30} {1,-40} (installed: {2})" -f $_.name, $_.version, $LocalList[$_.name])
+            }
+            else
+            {
+                Write-Notice ("{0,-30} {1,-40} (installed: {2})" -f $_.name, $_.version, $LocalList[$_.name])
+            }
+        }
+        else
+        {
+            Write-Host ("{0,-30} {1,-30}" -f $_.name, $_.version)
+        }
     }
 }
 

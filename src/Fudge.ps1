@@ -230,7 +230,8 @@ try
 
         {($_ -ieq 'search')}
             {
-                Invoke-Search -Key $Key -Limit $Limit
+                $localList = Get-ChocolateyLocalList
+                Invoke-Search -Key $Key -Limit $Limit -LocalList $localList
             }
 
         {($_ -ieq 'new')}
