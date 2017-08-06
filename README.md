@@ -143,6 +143,7 @@ fudge search git -l 20      # -l limits the results displayed, default is 10 (0 
 fudge new                   # creates a new empty template Fudgefile at the current path
 fudge new <nuspec_path>     # creates a new template Fudgefile, with packages/pack populated
 fudge new -fp './custom'    # creates a new Fudgefile, but with a custom name
+fudge new <nuspec_path> -i  # create new template from a nuspec, then installs the packages
 ```
 
 * To delete a Fudgefile:

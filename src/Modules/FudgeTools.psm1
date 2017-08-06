@@ -238,12 +238,10 @@ function Remove-Fudgefile
         $DevOnly
     )
 
-    # get the fudgefile content
-    $config = Get-Fudgefile $FudgefilePath
-
     # uninstall packages first, if requested
     if ($Uninstall)
     {
+        $config = Get-Fudgefile $FudgefilePath
         Invoke-ChocolateyAction -Action 'uninstall' -Key $null -Config $config -Dev:$Dev -DevOnly:$DevOnly
     }
 
@@ -263,7 +261,16 @@ function New-Fudgefile
         $Key,
 
         [string]
-        $FudgefilePath
+        $FudgefilePath,
+
+        [switch]
+        $Install,
+
+        [switch]
+        $Dev,
+
+        [switch]
+        $DevOnly
     )
 
     # if the key is passed, ensure it's a valid nuspec file
@@ -317,6 +324,13 @@ function New-Fudgefile
     $fudge | ConvertTo-Json | Out-File -FilePath $FudgefilePath -Encoding utf8 -Force
     Write-Success " > created"
     Write-Details "   > $($FudgefilePath)"
+
+    # now install the packages, if request
+    if ($Install)
+    {
+        $config = Get-Fudgefile $FudgefilePath
+        Invoke-ChocolateyAction -Action 'install' -Key $null -Config $config -Dev:$Dev -DevOnly:$DevOnly
+    }
 }
 
 
@@ -794,12 +808,12 @@ function Invoke-Chocolatey
                 if ([string]::IsNullOrWhiteSpace($Version) -or $Version -ieq 'latest')
                 {
                     Write-Information "> Installing $($Package) (latest)" -NoNewLine
-                    choco install $Package -y | Out-Null
+                    $output = choco install $Package -y
                 }
                 else
                 {
                     Write-Information "> Installing $($Package) v$($Version)" -NoNewLine
-                    choco install $Package --version $Version -y | Out-Null
+                    $output = choco install $Package --version $Version -y
                 }
             }
         
@@ -808,19 +822,19 @@ function Invoke-Chocolatey
                 if ([string]::IsNullOrWhiteSpace($Version) -or $Version -ieq 'latest')
                 {
                     Write-Information "> Upgrading $($Package) to latest" -NoNewLine
-                    choco upgrade $Package -y | Out-Null
+                    $output = choco upgrade $Package -y
                 }
                 else
                 {
                     Write-Information "> Upgrading $($Package) to v$($Version)" -NoNewLine
-                    choco upgrade $Package --version $Version -y | Out-Null
+                    $output = choco upgrade $Package --version $Version -y
                 }
             }
 
         'uninstall'
             {
                 Write-Information "> Uninstalling $($Package)" -NoNewLine
-                choco uninstall $Package -y -x | Out-Null
+                $output = choco uninstall $Package -y -x
             }
 
         'pack'
@@ -832,7 +846,7 @@ function Invoke-Chocolatey
                 try
                 {
                     Push-Location $path
-                    choco pack $name | Out-Null
+                    $output = choco pack $name
                 }
                 finally
                 {
@@ -843,7 +857,19 @@ function Invoke-Chocolatey
 
     if (!$?)
     {
-        throw "Failed to $($Action) package: $($Package)"
+        $fail = $true
+
+        # if we're uninstalling, make sure it was successful and the error isnt false
+        if ($Action -ieq 'uninstall' -and ($output -ilike '*has been successfully uninstalled*' -or $output -ilike '*Cannot uninstall a non-existent package*'))
+        {
+            $fail = $false
+        }
+
+        if ($fail)
+        {
+            Write-Notice "`n`n$($output)`n"
+            throw "Failed to $($Action) package: $($Package)"
+        }
     }
 
     Write-Success " > $("$($Action)ed" -ireplace 'eed$', 'ed')"
