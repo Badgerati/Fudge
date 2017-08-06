@@ -654,6 +654,10 @@ function Invoke-Search
             Write-Host ("{0,-30} {1,-30}" -f $_.name, $_.version)
         }
     }
+
+    # display the total
+    $total = ($OrganisedResults | Measure-Object).Count
+    Write-Notice "$($total) package(s) found"
 }
 
 
