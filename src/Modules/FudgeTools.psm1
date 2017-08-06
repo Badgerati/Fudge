@@ -125,8 +125,8 @@ function Get-Levenshtein
 }
 
 
-# checks to see if a passed path is a valid nuspec file
-function Test-Nuspec
+# checks to see if a passed path is a valid nuspec file path
+function Test-NuspecPath
 {
     param (
         [string]
@@ -136,33 +136,72 @@ function Test-Nuspec
     # ensure a path was passed
     if ([string]::IsNullOrWhiteSpace($Path))
     {
-        throw 'No path to a valid nuspec file passed'
+        return $false
     }
 
     # ensure path is exists, or is not just a directory path
     if (!(Test-Path $Path) -or ((Get-Item $Path) -is [System.IO.DirectoryInfo]))
     {
-        throw "Path to nuspec file doesn't exist or is invalid: $($Path)"
+        return $false
+    }
+
+    return $true
+}
+
+
+# checks to see if the file at passed path is a valid XML file
+function Test-XmlContent
+{
+    param (
+        [string]
+        $Path
+    )
+
+    # fail if the path doesn't exist
+    if ([string]::IsNullOrWhiteSpace($Path) -or !(Test-Path $Path))
+    {
+        return $false
     }
 
     # ensure the content parses as xml
     try
     {
-        $content = [xml](Get-Content $Path)
+        [xml](Get-Content $Path) | Out-Null
+        return $true
     }
     catch [exception]
     {
-        throw "Nuspec file fails to parse as a valid XML document: $($Path)"
+        return $false
     }
+}
 
-    # ensure we have package and metadata tags
-    if ($content.package -eq $null -or $content.package.metadata -eq $null)
+
+# checks to see if the passed XML content is a valid nuspec file
+function Test-NuspecContent
+{
+    param (
+        [xml]
+        $Content
+    )
+
+    return ($Content -ne $null -and $Content.package -ne $null -and $Content.package.metadata -ne $null)
+}
+
+
+# returns the XML content of the file at the passed path
+function Get-XmlContent
+{
+    param (
+        [string]
+        $Path
+    )
+
+    if (!(Test-XmlContent $Path))
     {
-        throw "Nuspec file is missing the package/metadata XML sections: $($Path)"
+        return $null
     }
 
-    # file is valid
-    return $content
+    return [xml](Get-Content $Path)
 }
 
 
@@ -276,7 +315,23 @@ function New-Fudgefile
     # if the key is passed, ensure it's a valid nuspec file
     if (![string]::IsNullOrWhiteSpace($Key))
     {
-        $nuspecData = Test-Nuspec $Key
+        if (!(Test-NuspecPath $Key))
+        {
+            throw "Path to nuspec file doesn't exist or is invalid: $($Key)"
+        }
+
+        if (!(Test-XmlContent $Key))
+        {
+            throw "Nuspec file fails to parse as a valid XML document: $($Key)"
+        }
+
+        $nuspecData = Get-XmlContent $Key
+
+        if (!(Test-NuspecContent $nuspecData))
+        {
+            throw "Nuspec file is missing the package/metadata XML sections: $($Key)"
+        }
+
         $nuspecName = Split-Path -Leaf -Path $Key
         Write-Information "> Creating new Fudgefile using $($nuspecName)" -NoNewLine
     }
