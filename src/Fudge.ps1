@@ -47,6 +47,11 @@
     .PARAMETER Version
         Switch parameter, if supplied will just display the current version of Fudge installed
         [Alias: -v]
+
+    .PARAMETER Install
+        Switch parameter, if supplied will install packages after creating a new Fudgefile
+        [Actions: new]
+        [Alias: -i]
     
     .PARAMETER Uninstall
         Switch parameter, if supplied will uninstall packages before deleting a Fudgefile
@@ -93,13 +98,17 @@ param (
     [switch]
     $DevOnly,
 
-    [Alias('v')]
+    [Alias('i')]
     [switch]
-    $Version,
+    $Install,
 
     [Alias('u')]
     [switch]
-    $Uninstall
+    $Uninstall,
+
+    [Alias('v')]
+    [switch]
+    $Version
 )
 
 # ensure if there's an error, we stop
@@ -200,9 +209,9 @@ try
 
     # check if the console is elevated (only needs to be done for certain actions)
     $isAdminAction = @('list', 'search', 'new', 'delete') -inotcontains $Action
-    $deleteNeedsAdmin = $Action -ieq 'delete' -and $Uninstall
+    $actionNeedsAdmin = ($Action -ieq 'delete' -and $Uninstall) -or ($Action -ieq 'new' -and $Install)
 
-    if ((!$isChocoInstalled -or $isAdminAction -or $deleteNeedsAdmin) -and !(Test-AdminUser))
+    if ((!$isChocoInstalled -or $isAdminAction -or $actionNeedsAdmin) -and !(Test-AdminUser))
     {
         Write-Notice 'Must be running with administrator priviledges for Fudge to fully function'
         return
@@ -250,7 +259,7 @@ try
 
         {($_ -ieq 'new')}
             {
-                New-Fudgefile -Key $Key -FudgefilePath $FudgefilePath
+                New-Fudgefile -Key $Key -FudgefilePath $FudgefilePath -Install:$Install -Dev:$Dev -DevOnly:$DevOnly
             }
 
         {($_ -ieq 'delete')}
