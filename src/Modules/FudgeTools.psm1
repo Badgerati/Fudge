@@ -221,6 +221,40 @@ function Get-Fudgefile
 }
 
 
+# removes an existing fudgefile, and if passed attempting to uninstall the packages
+function Remove-Fudgefile
+{
+    param (
+        [string]
+        $FudgefilePath,
+
+        [switch]
+        $Uninstall,
+
+        [switch]
+        $Dev,
+
+        [switch]
+        $DevOnly
+    )
+
+    # get the fudgefile content
+    $config = Get-Fudgefile $FudgefilePath
+
+    # uninstall packages first, if requested
+    if ($Uninstall)
+    {
+        Invoke-ChocolateyAction -Action 'uninstall' -Key $null -Config $config -Dev:$Dev -DevOnly:$DevOnly
+    }
+
+    # remove the fudgefile
+    Write-Information "> Deleting Fudgefile" -NoNewLine
+    Remove-Item -Path $FudgefilePath -Force -Confirm:$false | Out-Null
+    Write-Success " > deleted"
+    Write-Details "   > $($FudgefilePath)"
+}
+
+
 # create a new empty fudgefile, or a new one from a nuspec file
 function New-Fudgefile
 {
