@@ -140,7 +140,7 @@ function Test-NuspecPath
     }
 
     # ensure path is exists, or is not just a directory path
-    if (!(Test-Path $Path) -or ((Get-Item $Path) -is [System.IO.DirectoryInfo]))
+    if (!(Test-Path $Path) -or (Test-PathDirectory $Path))
     {
         return $false
     }
@@ -205,55 +205,67 @@ function Get-XmlContent
 }
 
 
-# checks to see if the fudgefile exists, and returns a valid path
-function Test-Fudgefile
+# checks to see if a passed path is a directory
+function Test-PathDirectory
 {
     param (
         [string]
-        $FudgefilePath,
-
-        [switch]
-        $DoesntExist
+        $Path
     )
 
-    $path = './Fudgefile'
-    if (![string]::IsNullOrWhiteSpace($FudgefilePath))
+    if ([string]::IsNullOrWhiteSpace($Path) -or !(Test-Path $Path))
     {
-        if ((Test-Path $FudgefilePath) -and ((Get-Item $FudgefilePath) -is [System.IO.DirectoryInfo]))
-        {
-            $path = Join-Path $FudgefilePath 'Fudgefile'
-        }
-        else
-        {
-            $path = $FudgefilePath
-        }
+        return $false
     }
 
-    if (!$DoesntExist -and !(Test-Path $path))
-    {
-        throw "Path to Fudgefile does not exist: $($path)"
-    }
-    elseif ($DoesntExist -and (Test-Path $path))
-    {
-        throw "Path to Fudgefile already exists: $($path)"
-    }
-
-    return $path
+    return ((Get-Item $Path) -is [System.IO.DirectoryInfo])
 }
 
 
-# returns the content of a passed fudgefile
-function Get-Fudgefile
+# returns a path to a fidgefile based on a passed path
+function Get-FudgefilePath
 {
     param (
         [string]
-        $FudgefilePath
+        $Path
     )
 
-    $config = Get-Content -Path $FudgefilePath -Raw | ConvertFrom-Json
+    $rootpath = './Fudgefile'
+    if (![string]::IsNullOrWhiteSpace($Path))
+    {
+        if ((Test-Path $Path) -and (Test-PathDirectory $Path))
+        {
+            $rootpath = Join-Path $Path 'Fudgefile'
+        }
+        else
+        {
+            $rootpath = $Path
+        }
+    }
+
+    return $rootpath
+}
+
+
+# returns the content of a passed fudgefile path
+function Get-FudgefileContent
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $Path
+    )
+
+    if (!(Test-Path $Path))
+    {
+        throw "Path to Fudgefile does not exist: $($Path)"
+    }
+
+    $config = Get-Content -Path $Path -Raw | ConvertFrom-Json
     if (!$?)
     {
-        throw "Failed to parse the Fudgefile at: $($FudgefilePath)"
+        throw "Failed to parse the Fudgefile at: $($Path)"
     }
 
     return $config
@@ -264,8 +276,10 @@ function Get-Fudgefile
 function Remove-Fudgefile
 {
     param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [string]
-        $FudgefilePath,
+        $Path,
 
         [switch]
         $Uninstall,
@@ -277,18 +291,24 @@ function Remove-Fudgefile
         $DevOnly
     )
 
+    # ensure the path actually exists
+    if (!(Test-Path $Path))
+    {
+        throw "Path to Fudgefile does not exist: $($Path)"
+    }
+
     # uninstall packages first, if requested
     if ($Uninstall)
     {
-        $config = Get-Fudgefile $FudgefilePath
+        $config = Get-FudgefileContent $Path
         Invoke-ChocolateyAction -Action 'uninstall' -Key $null -Config $config -Dev:$Dev -DevOnly:$DevOnly
     }
 
     # remove the fudgefile
     Write-Information "> Deleting Fudgefile" -NoNewLine
-    Remove-Item -Path $FudgefilePath -Force -Confirm:$false | Out-Null
+    Remove-Item -Path $Path -Force -Confirm:$false | Out-Null
     Write-Success " > deleted"
-    Write-Details "   > $($FudgefilePath)"
+    Write-Details "   > $($Path)"
 }
 
 
@@ -383,7 +403,7 @@ function New-Fudgefile
     # now install the packages, if request
     if ($Install)
     {
-        $config = Get-Fudgefile $FudgefilePath
+        $config = Get-FudgefileContent $FudgefilePath
         Invoke-ChocolateyAction -Action 'install' -Key $null -Config $config -Dev:$Dev -DevOnly:$DevOnly
     }
 }
@@ -450,15 +470,16 @@ function Test-Empty
 # check to see if chocolatey is installed on the current machine
 function Test-Chocolatey
 {
-    $output = powershell.exe /C "choco -v"
-    $success = ($LASTEXITCODE -eq 0)
-
-    if ($success)
+    try
     {
+        $output = Invoke-Expression -Command 'choco -v'
         Write-Details "Chocolatey v$($output)`n"
+        return $true
     }
-
-    return $success
+    catch
+    {
+        return $false
+    }
 }
 
 
@@ -557,6 +578,12 @@ function Invoke-ChocolateyAction
         [switch]
         $DevOnly
     )
+
+    # ensure the config object exists
+    if ($Config -eq $null)
+    {
+        throw "Invalid Fudge configuration supplied"
+    }
 
     # invoke pre-script for current action
     Invoke-Script -Action $Action -Stage 'pre' -Scripts $Config.scripts

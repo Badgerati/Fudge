@@ -159,17 +159,28 @@ try
     }
 
 
+    # get the Fudgefile path
+    $FudgefilePath = Get-FudgefilePath $FudgefilePath
+
+
     # ensure that the Fudgefile exists (for certain actions), and deserialise it
     if (($packageActions + $packingActions + $alterActions) -icontains $Action)
     {
-        $FudgefilePath = Test-Fudgefile $FudgefilePath
-        $config = Get-Fudgefile $FudgefilePath
+        if (!(Test-Path $FudgefilePath))
+        {
+            throw "Path to Fudgefile does not exist: $($FudgefilePath)"
+        }
+
+        $config = Get-FudgefileContent $FudgefilePath
     }
 
     # ensure that the Fudgefile doesn't exist
     elseif ($newActions -icontains $Action)
     {
-        $FudgefilePath = Test-Fudgefile $FudgefilePath -DoesntExist
+        if (Test-Path $FudgefilePath)
+        {
+            throw "Path to Fudgefile already exists: $($FudgefilePath)"
+        }
     }
 
 
@@ -264,7 +275,7 @@ try
 
         {($_ -ieq 'delete')}
             {
-                Remove-Fudgefile -FudgefilePath $FudgefilePath -Uninstall:$Uninstall -Dev:$Dev -DevOnly:$DevOnly
+                Remove-Fudgefile -Path $FudgefilePath -Uninstall:$Uninstall -Dev:$Dev -DevOnly:$DevOnly
             }
     }
 }
