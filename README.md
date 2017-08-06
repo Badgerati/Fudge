@@ -26,7 +26,7 @@ If you find any bugs, or have any feature requests, please raise them in the Git
 * You can reinstall all packages, or just in/un/reinstall all packages
 * Allows you to have mutliple nuspecs, which you can then pack one or all of with Fudge
 * See details about packages in a Fudgefile - such as which ones are installed or need upgrading
-* Create template Fudgefiles from nuspec files
+* Create empty template Fudgefiles, or create them from nuspec files
 
 ## Description
 
@@ -99,6 +99,7 @@ fudge pack <id>         # pack one or all nuspec files
 fudge list              # list information about packages in the Fudgefile
 fudge search <id>       # search chocolatey for packages, but results are sorted
 fudge new <nuspec>      # create an empty Fudgefile, or a populated one from a nuspec
+fudge delete            # deletes a Fudgefile, with option of uninstalling packages first
 ```
 
 * To install developer only packages (also works with upgrade/uninstall/reinstall):
@@ -142,6 +143,14 @@ fudge search git -l 20      # -l limits the results displayed, default is 10 (0 
 fudge new                   # creates a new empty template Fudgefile at the current path
 fudge new <nuspec_path>     # creates a new template Fudgefile, with packages/pack populated
 fudge new -fp './custom'    # creates a new Fudgefile, but with a custom name
+```
+
+* To delete a Fudgefile:
+
+```powershell
+fudge delete                # delete the default Fudgefile at the current path
+fudge delete -fp './custom' # delete a custom Fudgefile
+fudge delete -u             # delete the Fudgefile, but first uninstall the packages
 ```
 
 * To specify a path to a Fudgefile:

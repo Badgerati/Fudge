@@ -13,7 +13,7 @@
     
     .PARAMETER Action
         The action that Fudge should undertake
-        Actions: install, upgrade, uninstall, reinstall, pack, list, search, new
+        Actions: install, upgrade, uninstall, reinstall, pack, list, search, new, delete
         [Alias: -a]
 
     .PARAMETER Key
@@ -23,35 +23,41 @@
     .PARAMETER FudgefilePath
         This will override looking for a default 'Fudgefile' at the root of the current path, and allow you to specify
         other files instead. This allows you to have multiple Fudgefiles
+        [Actions: install, upgrade, uninstall, reinstall, pack, list, new, delete]
         [Default: ./Fudgefile]
         [Alias: -fp]
 
     .PARAMETER Limit
         This argument only applies for the 'search' action. It will limit the amount of packages returned when searching
         If 0 is supplied, the full list is returned
+        [Actions: search]
         [Default: 10]
         [Alias: -l]
 
     .PARAMETER Dev
         Switch parameter, if supplied will also action upon the devPackages in the Fudgefile
+        [Actions: install, upgrade, uninstall, reinstall, list, delete]
         [Alias: -d]
 
     .PARAMETER DevOnly
         Switch parameter, if supplied will only action upon the devPackages in the Fudgefile
+        [Actions: install, upgrade, uninstall, reinstall, list, delete]
         [Alias: -do]
     
     .PARAMETER Version
         Switch parameter, if supplied will just display the current version of Fudge installed
         [Alias: -v]
+    
+    .PARAMETER Uninstall
+        Switch parameter, if supplied will uninstall packages before deleting a Fudgefile
+        [Actions: delete]
+        [Alias: -u]
 
     .EXAMPLE
         fudge install
 
     .EXAMPLE
-        fudge upgrade -d    # to also upgrade devPackages
-
-    .EXAMPLE
-        fudge install -do   # to only install devPackages
+        fudge install -d    # to also install devPackages (-do will only install devPackages)
     
     .EXAMPLE
         fudge pack website
@@ -89,7 +95,11 @@ param (
 
     [Alias('v')]
     [switch]
-    $Version
+    $Version,
+
+    [Alias('u')]
+    [switch]
+    $Uninstall
 )
 
 # ensure if there's an error, we stop
@@ -123,7 +133,8 @@ try
     $packingActions = @('pack')
     $miscActions = @('search')
     $newActions = @('new')
-    $actions = ($packageActions + $packingActions + $miscActions + $newActions)
+    $alterActions = @('delete')
+    $actions = ($packageActions + $packingActions + $miscActions + $newActions + $alterActions)
 
     if ((Test-Empty $Action) -or $actions -inotcontains $Action)
     {
@@ -140,7 +151,7 @@ try
 
 
     # ensure that the Fudgefile exists (for certain actions), and deserialise it
-    if ($packageActions -icontains $Action -or $packingActions -icontains $Action)
+    if (($packageActions + $packingActions + $alterActions) -icontains $Action)
     {
         $FudgefilePath = Test-Fudgefile $FudgefilePath
         $config = Get-Fudgefile $FudgefilePath
@@ -188,7 +199,10 @@ try
 
 
     # check if the console is elevated (only needs to be done for certain actions)
-    if ((!$isChocoInstalled -or (@('list', 'search', 'new') -inotcontains $Action)) -and !(Test-AdminUser))
+    $isAdminAction = @('list', 'search', 'new', 'delete') -inotcontains $Action
+    $deleteNeedsAdmin = $Action -ieq 'delete' -and $Uninstall
+
+    if ((!$isChocoInstalled -or $isAdminAction -or $deleteNeedsAdmin) -and !(Test-AdminUser))
     {
         Write-Notice 'Must be running with administrator priviledges for Fudge to fully function'
         return
@@ -237,6 +251,11 @@ try
         {($_ -ieq 'new')}
             {
                 New-Fudgefile -Key $Key -FudgefilePath $FudgefilePath
+            }
+
+        {($_ -ieq 'delete')}
+            {
+                Remove-Fudgefile -FudgefilePath $FudgefilePath -Uninstall:$Uninstall -Dev:$Dev -DevOnly:$DevOnly
             }
     }
 }
