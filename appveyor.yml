@@ -19,13 +19,17 @@ test_script:
       $results = Invoke-Pester .\tests -OutputFormat NUnitXml -OutputFile $file -PassThru
 
       # upload results
-      Write-Host "Uploading results for job $($env:APPVEYOR_JOB_ID)" -ForegroundColor Cyan
+      Write-Host "Uploading results for job ID '$($env:APPVEYOR_JOB_ID)''" -ForegroundColor Cyan
       (New-Object 'System.Net.WebClient').UploadFile("https://ci.appveyor.com/api/testresults/nunit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path $file))
+      Write-Host 'Results uploaded' -ForegroundColor Green
 
       # fail build if any tests failed
       Write-Host 'Checking if any of the tests have failed'
       if ($results.FailedCount -gt 0) {
-        Write-Host 'Some of the tests have failed'
+        Write-Host 'Some of the tests have failed' -ForegroundColor Red
         Push-AppveyorArtifact $file
         throw "$($results.FailedCount) tests failed."
+      }
+      else {
+        Write-Host 'No tests failed!' -ForegroundColor Green
       }
