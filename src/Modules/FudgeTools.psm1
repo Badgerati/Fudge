@@ -316,11 +316,13 @@ function Remove-Fudgefile
 function New-Fudgefile
 {
     param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [string]
-        $Key,
+        $Path,
 
         [string]
-        $FudgefilePath,
+        $Key,
 
         [switch]
         $Install,
@@ -396,14 +398,14 @@ function New-Fudgefile
     }
 
     # save contents as json
-    $fudge | ConvertTo-Json | Out-File -FilePath $FudgefilePath -Encoding utf8 -Force
+    $fudge | ConvertTo-Json | Out-File -FilePath $Path -Encoding utf8 -Force
     Write-Success " > created"
-    Write-Details "   > $($FudgefilePath)"
+    Write-Details "   > $($Path)"
 
-    # now install the packages, if request
-    if ($Install)
+    # now install the packages, if requested and if nuspec data was found
+    if ($Install -and $nuspecData -ne $null)
     {
-        $config = Get-FudgefileContent $FudgefilePath
+        $config = Get-FudgefileContent $Path
         Invoke-ChocolateyAction -Action 'install' -Key $null -Config $config -Dev:$Dev -DevOnly:$DevOnly
     }
 }
@@ -491,7 +493,7 @@ function Install-Chocolatey
     $policies = @('Unrestricted', 'ByPass', 'AllSigned')
     if ($policies -inotcontains (Get-ExecutionPolicy))
     {
-        Set-ExecutionPolicy  Bypass -Force
+        Set-ExecutionPolicy Bypass -Force
     }
 
     Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')) | Out-Null
@@ -504,6 +506,8 @@ function Install-Chocolatey
 function Invoke-Script
 {
     param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [string]
         $Action,
 
@@ -513,6 +517,12 @@ function Invoke-Script
         $Scripts
     )
 
+    # if there is no  stage, return
+    if (Test-Empty $Stage)
+    {
+        return
+    }
+
     # if there are no scripts, return
     if ((Test-Empty $Scripts) -or (Test-Empty $Scripts.$Stage))
     {
@@ -520,7 +530,7 @@ function Invoke-Script
     }
 
     $script = $Scripts.$Stage.$Action
-    if ([string]::IsNullOrWhiteSpace($script))
+    if (Test-Empty $script)
     {
         return
     }
@@ -534,6 +544,8 @@ function Invoke-Script
 function Start-ActionPackages
 {
     param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [string]
         $Action,
 
@@ -564,6 +576,8 @@ function Start-ActionPackages
 function Invoke-ChocolateyAction
 {
     param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [string]
         $Action,
 

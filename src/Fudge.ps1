@@ -270,7 +270,7 @@ try
 
         {($_ -ieq 'new')}
             {
-                New-Fudgefile -Key $Key -FudgefilePath $FudgefilePath -Install:$Install -Dev:$Dev -DevOnly:$DevOnly
+                New-Fudgefile -Path $FudgefilePath -Key $Key -Install:$Install -Dev:$Dev -DevOnly:$DevOnly
             }
 
         {($_ -ieq 'delete')}

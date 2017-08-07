@@ -484,7 +484,7 @@ Describe 'Remove-Fudgefile' {
         It 'Should pass because the path exists' {
             Mock Test-Path { return $true } -ModuleName FudgeTools
             Mock Get-FudgefileContent { return ('{"key":"value"}' | ConvertFrom-Json) } -ModuleName FudgeTools
-            Mock Invoke-ChocolateyAction { } -ModuleName FudgeTools -ParameterFilter { $Action -ieq 'uninstall' }
+            Mock Invoke-ChocolateyAction { } -ModuleName FudgeTools
             Mock Remove-Item { } -ModuleName FudgeTools
 
             { Remove-Fudgefile -Path 'fake' -Uninstall } | Should Not Throw
@@ -492,7 +492,7 @@ Describe 'Remove-Fudgefile' {
             Assert-MockCalled Test-Path -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Remove-Item -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Get-FudgefileContent -Times 1 -Scope It -ModuleName FudgeTools
-            Assert-MockCalled Invoke-ChocolateyAction -Times 1 -Scope It -ModuleName FudgeTools  -ParameterFilter { $Action -ieq 'uninstall' }
+            Assert-MockCalled Invoke-ChocolateyAction -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Write-Information -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Write-Success -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Write-Details -Times 1 -Scope It -ModuleName FudgeTools
@@ -501,6 +501,192 @@ Describe 'Remove-Fudgefile' {
 }
 
 
+Describe 'New-Fudgefile' {
+    Mock Write-Information { } -ModuleName FudgeTools
+    Mock Write-Success { } -ModuleName FudgeTools
+    Mock Write-Details { } -ModuleName FudgeTools
+    Mock Out-File { } -ModuleName FudgeTools
+    Mock Invoke-ChocolateyAction { } -ModuleName FudgeTools
+
+    Context 'When no path is passed' {
+        It 'Should fail parameter validation for null' {
+            { New-Fudgefile -Path $null } | Should Throw 'The argument is null or empty'
+        }
+
+        It 'Should fail parameter validation for empty' {
+            { New-Fudgefile -Path ([string]::Empty) } | Should Throw 'The argument is null or empty'
+        }
+    }
+
+    Context 'When no values are passed, except the path' {
+        It 'Should create an empty template' {
+            { New-Fudgefile -Path 'fake' } | Should Not Throw
+
+            Assert-MockCalled Write-Information -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Out-File -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Success -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Details -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Invoke-ChocolateyAction -Times 0 -Scope It -ModuleName FudgeTools
+        }
+
+        It 'Should create an empty template, and not run install' {
+            { New-Fudgefile -Path 'fake' -Install } | Should Not Throw
+
+            Assert-MockCalled Write-Information -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Out-File -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Success -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Details -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Invoke-ChocolateyAction -Times 0 -Scope It -ModuleName FudgeTools
+        }
+    }
+
+    Context 'When a nuspec path is passed' {
+        It 'Should fail for an invalid nuspec path' {
+            Mock Test-NuspecPath { return $false } -ModuleName FudgeTools
+            Mock Test-XmlContent { return $true } -ModuleName FudgeTools
+            Mock Test-NuspecContent { return $true } -ModuleName FudgeTools
+            Mock Get-XmlContent { return ([xml]'<root></root>') } -ModuleName FudgeTools
+
+            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Throw "Path to nuspec file doesn't exist"
+
+            Assert-MockCalled Test-NuspecPath -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Test-XmlContent -Times 0 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Test-NuspecContent -Times 0 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Get-XmlContent -Times 0 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Information -Times 0 -Scope It -ModuleName FudgeTools
+        }
+
+        It 'Should fail for invalid XML content in nuspec file' {
+            Mock Test-NuspecPath { return $true } -ModuleName FudgeTools
+            Mock Test-XmlContent { return $false } -ModuleName FudgeTools
+            Mock Test-NuspecContent { return $true } -ModuleName FudgeTools
+            Mock Get-XmlContent { return ([xml]'<root></root>') } -ModuleName FudgeTools
+
+            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Throw "Nuspec file fails to parse as a valid XML"
+
+            Assert-MockCalled Test-NuspecPath -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Test-XmlContent -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Test-NuspecContent -Times 0 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Get-XmlContent -Times 0 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Information -Times 0 -Scope It -ModuleName FudgeTools
+        }
+
+        It 'Should fail for invalid nuspec content in file' {
+            Mock Test-NuspecPath { return $true } -ModuleName FudgeTools
+            Mock Test-XmlContent { return $true } -ModuleName FudgeTools
+            Mock Test-NuspecContent { return $false } -ModuleName FudgeTools
+            Mock Get-XmlContent { return ([xml]'<root></root>') } -ModuleName FudgeTools
+
+            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Throw "Nuspec file is missing the package/metadata XML"
+
+            Assert-MockCalled Test-NuspecPath -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Test-XmlContent -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Test-NuspecContent -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Get-XmlContent -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Information -Times 0 -Scope It -ModuleName FudgeTools
+        }
+
+        It 'Should create a populated template' {
+            Mock Test-NuspecPath { return $true } -ModuleName FudgeTools
+            Mock Test-XmlContent { return $true } -ModuleName FudgeTools
+            Mock Test-NuspecContent { return $true } -ModuleName FudgeTools
+            Mock Get-XmlContent { return ([xml]'<root></root>') } -ModuleName FudgeTools
+
+            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Not Throw
+
+            Assert-MockCalled Test-NuspecPath -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Test-XmlContent -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Test-NuspecContent -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Get-XmlContent -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Information -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Out-File -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Success -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Details -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Invoke-ChocolateyAction -Times 0 -Scope It -ModuleName FudgeTools
+        }
+
+        It 'Should create a populated template, and run install' {
+            Mock Test-NuspecPath { return $true } -ModuleName FudgeTools
+            Mock Test-XmlContent { return $true } -ModuleName FudgeTools
+            Mock Test-NuspecContent { return $true } -ModuleName FudgeTools
+            Mock Get-XmlContent { return ([xml]'<root></root>') } -ModuleName FudgeTools
+            Mock Get-FudgefileContent { return $null } -ModuleName FudgeTools
+
+            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' -Install } | Should Not Throw
+
+            Assert-MockCalled Test-NuspecPath -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Test-XmlContent -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Test-NuspecContent -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Get-XmlContent -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Information -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Out-File -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Success -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Details -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Get-FudgefileContent -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Invoke-ChocolateyAction -Times 1 -Scope It -ModuleName FudgeTools
+        }
+    }
+}
+
+
+Describe 'Test-AdminUser' {
+    Context 'When no user principal can be found' {
+        It 'Should return false' {
+            Mock New-Object { return $null } -ModuleName FudgeTools
+            Test-AdminUser | Should Be $false
+            Assert-MockCalled New-Object -Times 1 -Scope It -ModuleName FudgeTools
+        }
+    }
+}
+
+
+Describe 'Test-Empty' {
+    Context 'When no value is passed' {
+        It 'Should return true for no value' {
+            Test-Empty | Should be $true
+        }
+        
+        It 'Should return true for null value' {
+            Test-Empty -Value $null | Should be $true
+        }
+    }
+
+    Context 'When an empty value is passed' {
+        It 'Should return true for an empty array' {
+            Test-Empty -Value @() | Should Be $true
+        }
+        
+        It 'Should return true for an empty hashtable' {
+            Test-Empty -Value @{} | Should Be $true
+        }
+
+        It 'Should return true for an empty string' {
+            Test-Empty -Value ([string]::Empty) | Should Be $true
+        }
+
+        It 'Should return true for a whitespace string' {
+            Test-Empty -Value "  " | Should Be $true
+        }
+    }
+
+    Context 'When a valid value is passed' {
+        It 'Should return false for a string' {
+            Test-Empty -Value "test" | Should Be $false
+        }
+
+        It 'Should return false for a number' {
+            Test-Empty -Value 1 | Should Be $false
+        }
+
+        It 'Should return false for an array' {
+            Test-Empty -Value @('test') | Should Be $false
+        }
+
+        It 'Should return false for a hashtable' {
+            Test-Empty -Value @{'key'='value';} | Should Be $false
+        }
+    }
+}
 
 
 Describe 'Test-Chocolatey' {
@@ -555,6 +741,185 @@ Describe 'Install-Chocolatey' {
             Assert-MockCalled Invoke-Expression -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Write-Notice -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Write-Success -Times 1 -Scope It -ModuleName FudgeTools
+        }
+    }
+}
+
+
+Describe 'Invoke-Script' {
+    Mock Invoke-Expression { } -ModuleName FudgeTools
+
+    Context 'When no action is passed' {
+        It 'Should fail parameter validation for null' {
+            { Invoke-Script -Action $null } | Should Throw 'The argument is null or empty'
+        }
+
+        It 'Should fail parameter validation for empty' {
+            { Invoke-Script -Action ([string]::Empty) } | Should Throw 'The argument is null or empty'
+        }
+    }
+
+    Context 'When some of the parameter are not supplied' {        
+        It 'Should do nothing when no stage is passed' {
+            Mock Test-Empty { return $true } -ModuleName FudgeTools
+
+            { Invoke-Script -Action 'action' } | Should Not Throw
+
+            Assert-MockCalled Test-Empty -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Invoke-Expression -Times 0 -Scope It -ModuleName FudgeTools
+        }
+        
+        It 'Should do nothing when no scripts are passed' {
+            Mock Test-Empty { return $false } -ModuleName FudgeTools -ParameterFilter { $Value -ieq 'stage' }
+            Mock Test-Empty { return $true } -ModuleName FudgeTools
+
+            { Invoke-Script -Action 'action' -Stage 'stage' } | Should Not Throw
+
+            Assert-MockCalled Test-Empty -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Test-Empty -Times 1 -Scope It -ModuleName FudgeTools -ParameterFilter { $Value -ieq 'stage' }
+            Assert-MockCalled Invoke-Expression -Times 0 -Scope It -ModuleName FudgeTools
+        }
+    }
+
+    Context 'When all values are passed' {
+        It 'Should do nothing when a script does not exist for action' {
+            Mock Test-Empty { return $true } -ModuleName FudgeTools -ParameterFilter { $Value -eq $null }
+            Mock Test-Empty { return $false } -ModuleName FudgeTools
+
+            { Invoke-Script -Action 'action' -Stage 'stage' -Scripts @{} } | Should Not Throw
+
+            Assert-MockCalled Test-Empty -Times 3 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Test-Empty -Times 1 -Scope It -ModuleName FudgeTools -ParameterFilter { $Value -eq $null }
+            Assert-MockCalled Invoke-Expression -Times 0 -Scope It -ModuleName FudgeTools
+        }
+        
+        It 'Should invoke the script if one is found' {
+            Mock Test-Empty { return $false } -ModuleName FudgeTools
+
+            { Invoke-Script -Action 'install' -Stage 'pre' -Scripts @{'pre' = @{ 'install' = 'fake' }; } } | Should Not Throw
+
+            Assert-MockCalled Test-Empty -Times 4 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Invoke-Expression -Times 1 -Scope It -ModuleName FudgeTools
+        }
+    }
+}
+
+
+Describe 'Start-ActionPackages' {
+    Mock Invoke-Chocolatey { } -ModuleName FudgeTools
+
+    Context 'When no action is passed' {
+        It 'Should fail parameter validation for null' {
+            { Start-ActionPackages -Action $null } | Should Throw 'The argument is null or empty'
+        }
+
+        It 'Should fail parameter validation for empty' {
+            { Start-ActionPackages -Action ([string]::Empty) } | Should Throw 'The argument is null or empty'
+        }
+    }
+
+    Context 'When parameters are passed' {
+        It 'Should do nothing when no packages are passed' {
+            Mock Test-Empty { return $true } -ModuleName FudgeTools
+            { Start-ActionPackages -Action 'action' } | Should Not Throw
+            Assert-MockCalled Test-Empty -Times 1 -Scope It -ModuleName FudgeTools
+        }
+
+        It 'Should call chocolatey once for one package' {
+            $packages = '{"package1":""}' | ConvertFrom-Json
+            Mock Test-Empty { return $false } -ModuleName FudgeTools
+
+            { Start-ActionPackages -Action 'action' -Packages $packages } | Should Not Throw
+
+            Assert-MockCalled Test-Empty -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Invoke-Chocolatey -Times 1 -Scope It -ModuleName FudgeTools
+        }
+
+        It 'Should call chocolatey thrice for three package' {
+            $packages = '{"package1":"","package2":"","package3":""}' | ConvertFrom-Json
+            Mock Test-Empty { return $false } -ModuleName FudgeTools
+
+            { Start-ActionPackages -Action 'action' -Packages $packages } | Should Not Throw
+
+            Assert-MockCalled Test-Empty -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Invoke-Chocolatey -Times 3 -Scope It -ModuleName FudgeTools
+        }
+
+        It 'Should call chocolatey once for three package, with key passed' {
+            $packages = '{"package1":"","package2":"","package3":""}' | ConvertFrom-Json
+            Mock Test-Empty { return $false } -ModuleName FudgeTools
+
+            { Start-ActionPackages -Action 'action' -Key 'package2' -Packages $packages } | Should Not Throw
+
+            Assert-MockCalled Test-Empty -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Invoke-Chocolatey -Times 1 -Scope It -ModuleName FudgeTools
+        }
+    }
+}
+
+
+Describe 'Invoke-ChocolateyAction' {
+    Mock Invoke-Script { } -ModuleName FudgeTools
+    Mock Start-ActionPackages { } -ModuleName FudgeTools
+
+    Context 'When no action is passed' {
+        It 'Should fail parameter validation for null' {
+            { Invoke-ChocolateyAction -Action $null } | Should Throw 'The argument is null or empty'
+        }
+
+        It 'Should fail parameter validation for empty' {
+            { Invoke-ChocolateyAction -Action ([string]::Empty) } | Should Throw 'The argument is null or empty'
+        }
+    }
+
+    Context 'When parameters are passed' {
+        It 'Should fail when no config section is passed' {
+            { Invoke-ChocolateyAction -Action 'action' -Config $null } | Should Throw 'Invalid Fudge configuration supplied'
+        }
+
+        It 'Should call pre, post and action once for packing' {
+            { Invoke-ChocolateyAction -Action 'pack' -Config @{} } | Should Not Throw
+            Assert-MockCalled Invoke-Script -Times 2 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Start-ActionPackages -Times 1 -Scope It -ModuleName FudgeTools
+        }
+
+        It 'Should call pre, post and action once for install and no dev' {
+            { Invoke-ChocolateyAction -Action 'install' -Config @{} } | Should Not Throw
+            Assert-MockCalled Invoke-Script -Times 2 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Start-ActionPackages -Times 1 -Scope It -ModuleName FudgeTools
+        }
+
+        It 'Should call pre, post and action twice for install with dev' {
+            { Invoke-ChocolateyAction -Action 'install' -Config @{} -Dev } | Should Not Throw
+            Assert-MockCalled Invoke-Script -Times 2 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Start-ActionPackages -Times 2 -Scope It -ModuleName FudgeTools
+        }
+
+        It 'Should call pre, post and action once for install and dev only' {
+            { Invoke-ChocolateyAction -Action 'install' -Config @{} -DevOnly -Dev } | Should Not Throw
+            Assert-MockCalled Invoke-Script -Times 2 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Start-ActionPackages -Times 1 -Scope It -ModuleName FudgeTools
+        }
+    }
+}
+
+
+Describe 'Format-ChocolateyList' {
+    Context 'When no list is passed' {
+        It 'Should return an empty hashtable' {
+            Format-ChocolateyList | Should BeNullOrEmpty
+        }
+    }
+
+    Context 'When a list is passed' {
+        It 'Should return an empty hashtable for invalid values' {
+            Format-ChocolateyList -List @('something') | Should BeNullOrEmpty
+        }
+
+        It 'Should return a non-empty hashtable for valid values' {
+            $value = Format-ChocolateyList -List @('git.install 2.3.2')
+            $value | Should Not BeNullOrEmpty
+            $value.'git.install' | Should Be '2.3.2'
         }
     }
 }
