@@ -34,6 +34,14 @@
         [Default: 10]
         [Alias: -l]
 
+    .PARAMETER Source
+        Passing this argument will allow you to specify custom source locations to get/download packages for Chocolatey.
+        This allows you to install packages from local directions, or from custom Chocolatey servers. Passing this will
+        also override the source specified in any Fudgefiles
+        [Default: Chocolatey's server]
+        [Actions: install, upgrade, reinstall, search]
+        [Alias: -s]
+
     .PARAMETER Dev
         Switch parameter, if supplied will also action upon the devPackages in the Fudgefile
         [Actions: install, upgrade, uninstall, reinstall, list, delete]
@@ -90,6 +98,10 @@ param (
     [int]
     $Limit = 10,
 
+    [Alias('s')]
+    [string]
+    $Source,
+
     [Alias('d')]
     [switch]
     $Dev,
@@ -122,7 +134,7 @@ Import-Module "$($root)\Modules\FudgeTools.psm1" -ErrorAction Stop
 
 # output the version
 $ver = 'v$version$'
-Write-Details "Fudge $($ver)"
+Write-Success "Fudge $($ver)"
 
 # if we were only after the version, just return
 if ($Version)
@@ -172,6 +184,12 @@ try
         }
 
         $config = Get-FudgefileContent $FudgefilePath
+
+        # if we have a custom source in the config and no CLI source, set the source
+        if ((Test-Empty $Source) -and $config -ne $null -and !(Test-Empty $config.source))
+        {
+            $Source = $config.source
+        }
     }
 
     # ensure that the Fudgefile doesn't exist
@@ -214,6 +232,7 @@ try
         }
     }
 
+
     # check to see if chocolatey is installed
     $isChocoInstalled = Test-Chocolatey
 
@@ -237,18 +256,29 @@ try
     }
 
 
+    # if we are using a custom source, output it for info
+    if (!(Test-Empty $Source))
+    {
+        Write-Notice "Source: $($Source)`n"
+    }
+    else
+    {
+        Write-Host ([string]::Empty)
+    }
+
+
     # invoke chocolatey based on the action required
     switch ($Action)
     {
         {($_ -ieq 'install') -or ($_ -ieq 'uninstall') -or ($_ -ieq 'upgrade')}
             {
-                Invoke-ChocolateyAction -Action $Action -Key $Key -Config $config -Dev:$Dev -DevOnly:$DevOnly
+                Invoke-ChocolateyAction -Action $Action -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
             }
         
         {($_ -ieq 'reinstall')}
             {
-                Invoke-ChocolateyAction -Action 'uninstall' -Key $Key -Config $config -Dev:$Dev -DevOnly:$DevOnly
-                Invoke-ChocolateyAction -Action 'install' -Key $Key -Config $config -Dev:$Dev -DevOnly:$DevOnly
+                Invoke-ChocolateyAction -Action 'uninstall' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
+                Invoke-ChocolateyAction -Action 'install' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
             }
 
         {($_ -ieq 'pack')}
@@ -265,7 +295,7 @@ try
         {($_ -ieq 'search')}
             {
                 $localList = Get-ChocolateyLocalList
-                Invoke-Search -Key $Key -Limit $Limit -LocalList $localList
+                Invoke-Search -Key $Key -Limit $Limit -Source $Source -LocalList $localList
             }
 
         {($_ -ieq 'new')}

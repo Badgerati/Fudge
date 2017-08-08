@@ -60,6 +60,7 @@ Below is an example of what a `Fudgefile` looks like, with all components shown:
             "pack": "<command or file-path>"
         }
     },
+    "source": "<custom source || blank for chocolatey || use -s arg>",
     "packages": {
         "curl": "latest",
         "nodejs.install": "6.5.0"
