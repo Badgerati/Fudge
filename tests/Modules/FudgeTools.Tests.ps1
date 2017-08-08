@@ -835,6 +835,17 @@ Describe 'Start-ActionPackages' {
             Assert-MockCalled Invoke-Chocolatey -Times 1 -Scope It -ModuleName FudgeTools
         }
 
+        It 'Should call chocolatey once for one package and custom source' {
+            $packages = '{"package1":""}' | ConvertFrom-Json
+            Mock Test-Empty { return $false } -ModuleName FudgeTools
+            Mock Invoke-Chocolatey { } -ModuleName FudgeTools -ParameterFilter { $Source -ieq 'custom' }
+
+            { Start-ActionPackages -Action 'action' -Packages $packages -Source 'custom' } | Should Not Throw
+
+            Assert-MockCalled Test-Empty -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Invoke-Chocolatey -Times 1 -Scope It -ModuleName FudgeTools -ParameterFilter { $Source -ieq 'custom' }
+        }
+
         It 'Should call chocolatey thrice for three package' {
             $packages = '{"package1":"","package2":"","package3":""}' | ConvertFrom-Json
             Mock Test-Empty { return $false } -ModuleName FudgeTools
@@ -899,6 +910,31 @@ Describe 'Invoke-ChocolateyAction' {
             { Invoke-ChocolateyAction -Action 'install' -Config @{} -DevOnly -Dev } | Should Not Throw
             Assert-MockCalled Invoke-Script -Times 2 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Start-ActionPackages -Times 1 -Scope It -ModuleName FudgeTools
+        }
+    }
+}
+
+
+Describe 'Get-ChocolateySource' {
+    Context 'When getting a Chocolatey source parameter' {
+        It 'Should return empty for no source' {
+            Get-ChocolateySource | Should Be ([string]::Empty)
+        }
+        
+        It 'Should return empty for null source' {
+            Get-ChocolateySource -Source $null | Should Be ([string]::Empty)
+        }
+        
+        It 'Should return empty for empty source' {
+            Get-ChocolateySource -Source ([string]::Empty) | Should Be ([string]::Empty)
+        }
+
+        It 'Should return a parameter string for a local source' {
+            Get-ChocolateySource -Source '.' | Should Be "-s '.'"
+        }
+
+        It 'Should return a parameter string for a URL source' {
+            Get-ChocolateySource -Source 'http://test.repo.com' | Should Be "-s 'http://test.repo.com'"
         }
     }
 }

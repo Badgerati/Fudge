@@ -475,7 +475,7 @@ function Test-Chocolatey
     try
     {
         $output = Invoke-Expression -Command 'choco -v'
-        Write-Details "Chocolatey v$($output)`n"
+        Write-Details "Chocolatey v$($output)"
         return $true
     }
     catch
@@ -552,14 +552,19 @@ function Start-ActionPackages
         [string]
         $Key,
 
+        [string]
+        $Source,
+
         $Packages
     )
 
+    # if there are no packages to deal with, return
     if (Test-Empty $Packages)
     {
         return
     }
 
+    # loop through each of the packages, and call chocolatey on them
     foreach ($name in $Packages.psobject.properties.name)
     {
         if (![string]::IsNullOrWhiteSpace($Key) -and $name -ine $Key)
@@ -567,7 +572,7 @@ function Start-ActionPackages
             continue
         }
 
-        Invoke-Chocolatey -Action $Action -Package $name -Version ($Packages.$name)
+        Invoke-Chocolatey -Action $Action -Package $name -Version ($Packages.$name) -Source $Source
     }
 }
 
@@ -583,6 +588,9 @@ function Invoke-ChocolateyAction
 
         [string]
         $Key,
+
+        [string]
+        $Source,
 
         $Config,
 
@@ -605,18 +613,18 @@ function Invoke-ChocolateyAction
     # invoke chocolatey based on the action
     if ($Action -ieq 'pack')
     {
-        Start-ActionPackages -Action $Action -Packages $Config.pack
+        Start-ActionPackages -Action $Action -Packages $Config.pack -Source $Source
     }
     else
     {
         if (!$DevOnly)
         {
-            Start-ActionPackages -Action $Action -Packages $Config.packages
+            Start-ActionPackages -Action $Action -Packages $Config.packages -Source $Source
         }
 
         if ($Dev)
         {
-            Start-ActionPackages -Action $Action -Packages $Config.devPackages
+            Start-ActionPackages -Action $Action -Packages $Config.devPackages -Source $Source
         }
     }
     
@@ -625,15 +633,38 @@ function Invoke-ChocolateyAction
 }
 
 
+# returns a source argument for chocolatey
+function Get-ChocolateySource
+{
+    param (
+        [string]
+        $Source
+    )
+
+    if (Test-Empty $Source)
+    {
+        return [string]::Empty
+    }
+
+    return "-s '$($Source)'"
+}
+
+
 # returns the list of search returns from chocolatey
 function Get-ChocolateySearchList
 {
     param (
         [string]
-        $Key
+        $Key,
+
+        [string]
+        $Source
     )
 
-    $list = (choco search $Key)
+    # set the source if we have one
+    $Source = Get-ChocolateySource $Source
+
+    $list = (choco search $Key $Source)
     if (!$?)
     {
         Write-Fail "$($list)"
@@ -690,6 +721,9 @@ function Invoke-Search
         [int]
         $Limit,
 
+        [string]
+        $Source,
+
         $LocalList
     )
 
@@ -707,7 +741,7 @@ function Invoke-Search
     }
 
     # get search results from chocolatey
-    $results = Get-ChocolateySearchList -Key $Key
+    $results = Get-ChocolateySearchList -Key $Key -Source $Source
     $OrganisedResults = @()
     $count = 0
 
@@ -889,41 +923,49 @@ function Invoke-Chocolatey
         $Package,
 
         [string]
-        $Version
+        $Version,
+
+        [string]
+        $Source
     )
 
-    if ([string]::IsNullOrWhiteSpace($Package))
+    # if there was no package passed, return
+    if (Test-Empty $Package)
     {
         return
     }
 
+    # set the source from which to install/upgrade packages
+    $Source = Get-ChocolateySource $Source
+
+    # run chocolatey for appropriate action
     switch ($Action.ToLowerInvariant())
     {
         'install'
             {
-                if ([string]::IsNullOrWhiteSpace($Version) -or $Version -ieq 'latest')
+                if ((Test-Empty $Version) -or $Version -ieq 'latest')
                 {
                     Write-Information "> Installing $($Package) (latest)" -NoNewLine
-                    $output = choco install $Package -y
+                    $output = choco install $Package -y $Source
                 }
                 else
                 {
                     Write-Information "> Installing $($Package) v$($Version)" -NoNewLine
-                    $output = choco install $Package --version $Version -y
+                    $output = choco install $Package --version $Version -y $Source
                 }
             }
         
         'upgrade'
             {
-                if ([string]::IsNullOrWhiteSpace($Version) -or $Version -ieq 'latest')
+                if ((Test-Empty $Version) -or $Version -ieq 'latest')
                 {
                     Write-Information "> Upgrading $($Package) to latest" -NoNewLine
-                    $output = choco upgrade $Package -y
+                    $output = choco upgrade $Package -y $Source
                 }
                 else
                 {
                     Write-Information "> Upgrading $($Package) to v$($Version)" -NoNewLine
-                    $output = choco upgrade $Package --version $Version -y
+                    $output = choco upgrade $Package --version $Version -y $Source
                 }
             }
 
