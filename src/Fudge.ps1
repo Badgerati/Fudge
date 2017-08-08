@@ -36,7 +36,7 @@
 
     .PARAMETER Source
         Passing this argument will allow you to specify custom source locations to get/download packages for Chocolatey.
-        This allows you to install packages from local directions, or from custom Chocolatey servers. Passing this will
+        This allows you to install packages from local directories, or from custom Chocolatey servers. Passing this will
         also override the source specified in any Fudgefiles
         [Default: Chocolatey's server]
         [Actions: install, upgrade, reinstall, search]
