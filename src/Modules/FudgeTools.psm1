@@ -997,10 +997,18 @@ function Invoke-Chocolatey
     {
         $fail = $true
 
-        # if we're uninstalling, make sure it was successful and the error isnt false
-        if ($Action -ieq 'uninstall' -and ($output -ilike '*has been successfully uninstalled*' -or $output -ilike '*Cannot uninstall a non-existent package*'))
+        # double check that the error isn't a false positive
+        switch ($Action)
         {
-            $fail = $false
+            {($_ -ieq 'uninstall')}
+                {
+                    $fail = !($output -ilike '*has been successfully uninstalled*' -or $output -ilike '*Cannot uninstall a non-existent package*')
+                }
+
+            {($_ -ieq 'install')}
+                {
+                    $fail = !($output -ilike '*has been successfully installed*')
+                }
         }
 
         if ($fail)
@@ -1010,5 +1018,15 @@ function Invoke-Chocolatey
         }
     }
 
-    Write-Success " > $("$($Action)ed" -ireplace 'eed$', 'ed')"
+    $actionVerb = ("$($Action)ed" -ireplace 'eed$', 'ed')
+
+    if ($output -ilike '*exit code 3010*')
+    {
+        Write-Success " > $($actionVerb)" -NoNewLine
+        Write-Notice " > Reboot Required"
+    }
+    else
+    {
+        Write-Success " > $($actionVerb)"
+    }
 }
