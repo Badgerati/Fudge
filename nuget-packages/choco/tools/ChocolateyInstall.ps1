@@ -18,16 +18,7 @@ $packageArgs = @{
 Install-ChocolateyZipPackage @packageArgs
 
 # Install
+Write-Host 'Updating environment Path'
 $path = Join-Path $env:chocolateyPackageFolder 'tools/src'
-Push-Location $path
-
-try
-{
-    Write-Host 'Updating environment Path'
-    Install-ChocolateyPath -PathToInstall $path -PathType 'Machine'
-    Update-SessionEnvironment
-}
-finally
-{
-    Pop-Location
-}
+Install-ChocolateyPath -PathToInstall $path -PathType 'Machine'
+Update-SessionEnvironment

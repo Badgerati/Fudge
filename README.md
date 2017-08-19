@@ -15,7 +15,11 @@ If you find any bugs, or have any feature requests, please raise them in the Git
 
 ## Installing Fudge
 
-[Fudge](https://chocolatey.org/packages/fudge) can be installed via Chocolatey soon.
+[Fudge](https://chocolatey.org/packages/fudge) can be installed via Chocolatey:
+
+```powershell
+choco install fudge
+```
 
 ## Features
 
