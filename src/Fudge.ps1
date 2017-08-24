@@ -13,7 +13,7 @@
     
     .PARAMETER Action
         The action that Fudge should undertake
-        Actions: install, upgrade, uninstall, reinstall, pack, list, search, new, delete
+        Actions: install, upgrade, uninstall, reinstall, pack, list, search, new, delete, prune
         [Alias: -a]
 
     .PARAMETER Key
@@ -23,7 +23,7 @@
     .PARAMETER FudgefilePath
         This will override looking for a default 'Fudgefile' at the root of the current path, and allow you to specify
         other files instead. This allows you to have multiple Fudgefiles
-        [Actions: install, upgrade, uninstall, reinstall, pack, list, new, delete]
+        [Actions: install, upgrade, uninstall, reinstall, pack, list, new, delete, prune]
         [Default: ./Fudgefile]
         [Alias: -fp]
 
@@ -44,12 +44,12 @@
 
     .PARAMETER Dev
         Switch parameter, if supplied will also action upon the devPackages in the Fudgefile
-        [Actions: install, upgrade, uninstall, reinstall, list, delete]
+        [Actions: install, upgrade, uninstall, reinstall, list, delete, prune]
         [Alias: -d]
 
     .PARAMETER DevOnly
         Switch parameter, if supplied will only action upon the devPackages in the Fudgefile
-        [Actions: install, upgrade, uninstall, reinstall, list, delete]
+        [Actions: install, upgrade, uninstall, reinstall, list, delete, prune]
         [Alias: -do]
     
     .PARAMETER Version
@@ -151,11 +151,12 @@ try
 
     # ensure we have a valid action
     $packageActions = @('install', 'upgrade', 'uninstall', 'reinstall', 'list')
+    $maintainActions = @('prune')
     $packingActions = @('pack')
     $miscActions = @('search')
     $newActions = @('new')
     $alterActions = @('delete')
-    $actions = ($packageActions + $packingActions + $miscActions + $newActions + $alterActions)
+    $actions = ($packageActions + $maintainActions + $packingActions + $miscActions + $newActions + $alterActions)
 
     if ((Test-Empty $Action) -or $actions -inotcontains $Action)
     {
@@ -176,7 +177,7 @@ try
 
 
     # ensure that the Fudgefile exists (for certain actions), and deserialise it
-    if (($packageActions + $packingActions + $alterActions) -icontains $Action)
+    if (($packageActions + $maintainActions + $packingActions + $alterActions) -icontains $Action)
     {
         if (!(Test-Path $FudgefilePath))
         {
@@ -306,6 +307,12 @@ try
         {($_ -ieq 'delete')}
             {
                 Remove-Fudgefile -Path $FudgefilePath -Uninstall:$Uninstall -Dev:$Dev -DevOnly:$DevOnly
+            }
+
+        {($_ -ieq 'prune')}
+            {
+                $localList = Get-ChocolateyLocalList
+                Invoke-FudgePrune -Config $config -LocalList $localList -Dev:$Dev -DevOnly:$DevOnly
             }
     }
 }

@@ -21,6 +21,7 @@ Fudge is a PowerShell tool to help manage software packages via Chocolatey for s
 * Allows you to have mutliple nuspecs, which you can then pack one or all of with Fudge
 * See details about packages in a Fudgefile - such as which ones are installed or need upgrading
 * Create empty template Fudgefiles, or create them from nuspec files
+* Prune the machine to remove packages not in a Fudgefile (except chocolatey/fudge obviously!)
     </description>
     <projectUrl>https://github.com/Badgerati/Fudge</projectUrl>
     <packageSourceUrl>https://github.com/Badgerati/Fudge/tree/master/nuget-packages</packageSourceUrl>

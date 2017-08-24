@@ -17,7 +17,7 @@
         "curl": "latest"
     },
     "devPackages": {
-        "markdownpad2": "latest"
+        "7zip.install": "latest"
     },
     "pack": {
         "website": "./nuspecs/website.nuspec",
