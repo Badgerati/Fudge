@@ -32,6 +32,7 @@ choco install fudge
 * See details about packages in a Fudgefile - such as which ones are installed or need upgrading
 * Create empty template Fudgefiles, or create them from nuspec files
 * Prune the machine to remove packages not in a Fudgefile (except chocolatey/fudge obviously!)
+* Clean a machine of all packages installed (again, except chocolatey/fudge)
 
 ## Description
 
@@ -107,6 +108,7 @@ fudge search <id>       # search chocolatey for packages, but results are sorted
 fudge new <nuspec>      # create an empty Fudgefile, or a populated one from a nuspec
 fudge delete            # deletes a Fudgefile, with option of uninstalling packages first
 fudge prune             # uninstalls packages not in a Fudgefile (except choco/fudge)
+fudge clean             # uninstalls all packages currently installed (except choco/fudge)
 ```
 
 * To install developer only packages (also works with upgrade/uninstall/reinstall):
@@ -167,6 +169,12 @@ fudge delete -u             # delete the Fudgefile, but first uninstall the pack
 fudge prune                 # prunes the machine using the default Fudgefile
 fudge prune -fp './custum'  # prunes the machine using a custom Fudgefile
 fudge prune -d              # pruning now also respects the devPackages
+```
+
+* To clean a machine of all packages:
+
+```powershell
+fudge clean                 # cleans the machine of all packages installed
 ```
 
 * To specify a path to a Fudgefile:

@@ -633,7 +633,24 @@ function Invoke-ChocolateyAction
 }
 
 
-# syncing the current machine's packages with what's in the fudgefile
+# add the core chocolatey and fudge packages to a package map
+function Add-CoreChocoPackages
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNull()]
+        $Packages
+    )
+
+    $Packages['chocolatey'] = 'latest'
+    $Packages['chocolatey-core.extension'] = 'latest'
+    $Packages['fudge'] = 'latest'
+
+    return $Packages
+}
+
+
+# pruning the current machine's packages with what's in the fudgefile
 function Invoke-FudgePrune
 {
     param (
@@ -663,9 +680,7 @@ function Invoke-FudgePrune
     }
 
     # add core chocolatey packages (and fudge)
-    $packages['chocolatey'] = 'latest'
-    $packages['chocolatey-core.extension'] = 'latest'
-    $packages['fudge'] = 'latest'
+    $packages = Add-CoreChocoPackages $packages
 
     # loop through each local package, and remove if not in fudgefile
     $LocalList.Keys | ForEach-Object {
@@ -679,6 +694,36 @@ function Invoke-FudgePrune
     if(!$pruned)
     {
         Write-Notice 'Nothing to prune'
+    }
+}
+
+
+# cleaning a machine of all packages currently installed
+function Invoke-FudgeClean
+{
+    param (
+        $LocalList
+    )
+
+    # package map for what to leave installed
+    $packages = @{}
+    $cleaned = $false
+
+    # add core chocolatey packages (and fudge)
+    $packages = Add-CoreChocoPackages $packages
+
+    # loop through each local package, and remove it
+    $LocalList.Keys | ForEach-Object {
+        if (!$packages.ContainsKey($_))
+        {
+            $cleaned = $true
+            Invoke-Chocolatey -Action 'uninstall' -Package $_
+        }
+    }
+
+    if(!$cleaned)
+    {
+        Write-Notice 'Nothing to clean'
     }
 }
 
