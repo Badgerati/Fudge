@@ -13,7 +13,7 @@
     
     .PARAMETER Action
         The action that Fudge should undertake
-        Actions: install, upgrade, uninstall, reinstall, pack, list, search, new, delete, prune
+        Actions: install, upgrade, uninstall, reinstall, pack, list, search, new, delete, prune, clean
         [Alias: -a]
 
     .PARAMETER Key
@@ -153,7 +153,7 @@ try
     $packageActions = @('install', 'upgrade', 'uninstall', 'reinstall', 'list')
     $maintainActions = @('prune')
     $packingActions = @('pack')
-    $miscActions = @('search')
+    $miscActions = @('search', 'clean')
     $newActions = @('new')
     $alterActions = @('delete')
     $actions = ($packageActions + $maintainActions + $packingActions + $miscActions + $newActions + $alterActions)
@@ -313,6 +313,12 @@ try
             {
                 $localList = Get-ChocolateyLocalList
                 Invoke-FudgePrune -Config $config -LocalList $localList -Dev:$Dev -DevOnly:$DevOnly
+            }
+
+        {($_ -ieq 'clean')}
+            {
+                $localList = Get-ChocolateyLocalList
+                Invoke-FudgeClean -LocalList $localList
             }
     }
 }
