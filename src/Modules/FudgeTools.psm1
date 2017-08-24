@@ -728,6 +728,33 @@ function Invoke-FudgeClean
 }
 
 
+# returns the path for where a command is located
+function Invoke-FudgeWhich
+{
+    param (
+        [string]
+        $Key
+    )
+
+    if (Test-Empty $Key)
+    {
+        Write-Notice 'No command passed to find'
+    }
+    else
+    {
+        $path = (Get-Command -Name $Key -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Definition)
+        if (!(Test-Empty $path))
+        {
+            Write-Host "> $($path)"
+        }
+        else
+        {
+            Write-Notice "Command not found: $($Key)"
+        }
+    }
+}
+
+
 # returns a source argument for chocolatey
 function Get-ChocolateySource
 {
