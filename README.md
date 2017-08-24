@@ -31,6 +31,7 @@ choco install fudge
 * Allows you to have mutliple nuspecs, which you can then pack one or all of with Fudge
 * See details about packages in a Fudgefile - such as which ones are installed or need upgrading
 * Create empty template Fudgefiles, or create them from nuspec files
+* Prune the machine to remove packages not in a Fudgefile (except chocolatey/fudge obviously!)
 
 ## Description
 
@@ -105,6 +106,7 @@ fudge list              # list information about packages in the Fudgefile
 fudge search <id>       # search chocolatey for packages, but results are sorted
 fudge new <nuspec>      # create an empty Fudgefile, or a populated one from a nuspec
 fudge delete            # deletes a Fudgefile, with option of uninstalling packages first
+fudge prune             # uninstalls packages not in a Fudgefile (except choco/fudge)
 ```
 
 * To install developer only packages (also works with upgrade/uninstall/reinstall):
@@ -157,6 +159,14 @@ fudge new <nuspec_path> -i  # create new template from a nuspec, then installs t
 fudge delete                # delete the default Fudgefile at the current path
 fudge delete -fp './custom' # delete a custom Fudgefile
 fudge delete -u             # delete the Fudgefile, but first uninstall the packages
+```
+
+* To prune a machine of unneeded packages:
+
+```powershell
+fudge prune                 # prunes the machine using the default Fudgefile
+fudge prune -fp './custum'  # prunes the machine using a custom Fudgefile
+fudge prune -d              # pruning now also respects the devPackages
 ```
 
 * To specify a path to a Fudgefile:

@@ -633,6 +633,56 @@ function Invoke-ChocolateyAction
 }
 
 
+# syncing the current machine's packages with what's in the fudgefile
+function Invoke-FudgePrune
+{
+    param (
+        $Config,
+
+        $LocalList,
+
+        [switch]
+        $Dev,
+
+        [switch]
+        $DevOnly
+    )
+
+    # package map for what to leave installed
+    $packages = @{}
+    $pruned = $false
+
+    if (!$DevOnly)
+    {
+        $Config.packages.psobject.properties.name | ForEach-Object { $packages[$_] = $Config.packages.$_ }
+    }
+
+    if ($Dev)
+    {
+        $Config.devPackages.psobject.properties.name | ForEach-Object { $packages[$_] = $Config.devPackages.$_ }
+    }
+
+    # add core chocolatey packages (and fudge)
+    $packages['chocolatey'] = 'latest'
+    $packages['chocolatey-core.extension'] = 'latest'
+    $packages['fudge'] = 'latest'
+
+    # loop through each local package, and remove if not in fudgefile
+    $LocalList.Keys | ForEach-Object {
+        if (!$packages.ContainsKey($_))
+        {
+            $pruned = $true
+            Invoke-Chocolatey -Action 'uninstall' -Package $_
+        }
+    }
+
+    if(!$pruned)
+    {
+        Write-Notice 'Nothing to prune'
+    }
+}
+
+
 # returns a source argument for chocolatey
 function Get-ChocolateySource
 {
