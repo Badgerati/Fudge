@@ -109,6 +109,7 @@ fudge new <nuspec>      # create an empty Fudgefile, or a populated one from a n
 fudge delete            # deletes a Fudgefile, with option of uninstalling packages first
 fudge prune             # uninstalls packages not in a Fudgefile (except choco/fudge)
 fudge clean             # uninstalls all packages currently installed (except choco/fudge)
+fudge rebuild           # rebuilds the machine by running "clean" then "install"
 ```
 
 * To install developer only packages (also works with upgrade/uninstall/reinstall):
@@ -177,10 +178,12 @@ fudge prune -d              # pruning now also respects the devPackages
 fudge clean                 # cleans the machine of all packages installed
 ```
 
-* To specify a path to a Fudgefile:
+* To rebuild a machine:
 
 ```powershell
-fudge upgrade -FudgefilePath '.\path\SomeFudgeFile'
+fudge rebuild                 # rebuild the machine using the default Fudgefile
+fudge rebuild -fp './custum'  # rebuild the machine using a custom Fudgefile
+fudge rebuild -d              # rebuilding now also respects the devPackages
 ```
 
 ## Todo

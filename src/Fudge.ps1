@@ -13,17 +13,18 @@
     
     .PARAMETER Action
         The action that Fudge should undertake
-        Actions: install, upgrade, uninstall, reinstall, pack, list, search, new, delete, prune, clean, which
+        Actions: install, upgrade, uninstall, reinstall, pack, list, search, new, delete, prune, clean, rebuild, which, help
         [Alias: -a]
 
     .PARAMETER Key
         The key represents a package/nuspec name in the Fudgefile
+        [Actions: install, upgrade, uninstall, reinstall, pack, new, which]
         [Alias: -k]
     
     .PARAMETER FudgefilePath
         This will override looking for a default 'Fudgefile' at the root of the current path, and allow you to specify
         other files instead. This allows you to have multiple Fudgefiles
-        [Actions: install, upgrade, uninstall, reinstall, pack, list, new, delete, prune]
+        [Actions: install, upgrade, uninstall, reinstall, pack, list, new, delete, prune, rebuild]
         [Default: ./Fudgefile]
         [Alias: -fp]
 
@@ -39,17 +40,17 @@
         This allows you to install packages from local directories, or from custom Chocolatey servers. Passing this will
         also override the source specified in any Fudgefiles
         [Default: Chocolatey's server]
-        [Actions: install, upgrade, reinstall, search]
+        [Actions: install, upgrade, reinstall, search, rebuild]
         [Alias: -s]
 
     .PARAMETER Dev
         Switch parameter, if supplied will also action upon the devPackages in the Fudgefile
-        [Actions: install, upgrade, uninstall, reinstall, list, delete, prune]
+        [Actions: install, upgrade, uninstall, reinstall, list, delete, prune, rebuild]
         [Alias: -d]
 
     .PARAMETER DevOnly
         Switch parameter, if supplied will only action upon the devPackages in the Fudgefile
-        [Actions: install, upgrade, uninstall, reinstall, list, delete, prune]
+        [Actions: install, upgrade, uninstall, reinstall, list, delete, prune, rebuild]
         [Alias: -do]
     
     .PARAMETER Version
@@ -150,10 +151,10 @@ try
 
 
     # ensure we have a valid action
-    $packageActions = @('install', 'upgrade', 'uninstall', 'reinstall', 'list')
+    $packageActions = @('install', 'upgrade', 'uninstall', 'reinstall', 'list', 'rebuild')
     $maintainActions = @('prune')
     $packingActions = @('pack')
-    $miscActions = @('search', 'clean', 'which')
+    $miscActions = @('search', 'clean', 'which', 'help')
     $newActions = @('new')
     $alterActions = @('delete')
     $actions = ($packageActions + $maintainActions + $packingActions + $miscActions + $newActions + $alterActions)
@@ -161,6 +162,17 @@ try
     if ((Test-Empty $Action) -or $actions -inotcontains $Action)
     {
         Write-Fail "Unrecognised action supplied '$($Action)', should be either: $($actions -join ', ')"
+        return
+    }
+
+
+    # if action is just to display Help, show it and return
+    if ($Action -ieq 'help')
+    {
+        Write-Host "`nUsage: fudge <action>"
+        Write-Host "`nWhere <action> is one of:"
+        Write-Host "    clean, delete, help, install, list, new, pack, prune,"
+        Write-Host "    rebuild, reinstall, search, uninstall, upgrade, which"
         return
     }
 
@@ -324,6 +336,13 @@ try
         {($_ -ieq 'which')}
             {
                 Invoke-FudgeWhich -Key $Key
+            }
+
+        {($_ -ieq 'rebuild')}
+            {
+                $localList = Get-ChocolateyLocalList
+                Invoke-FudgeClean -LocalList $localList
+                Invoke-ChocolateyAction -Action 'install' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
             }
     }
 }
