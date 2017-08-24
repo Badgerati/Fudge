@@ -12,37 +12,114 @@
         Furthermore, Fudge has a section to allow you to specify multiple nuspec files and pack the one you need
     
     .PARAMETER Action
-        The action that Fudge should take: install, upgrade, uninstall, reinstall, pack
+        The action that Fudge should undertake
+        Actions: install, upgrade, uninstall, reinstall, pack, list, search, new, delete, prune, clean, rebuild, which, help
+        [Alias: -a]
+
+    .PARAMETER Key
+        The key represents a package/nuspec name in the Fudgefile
+        [Actions: install, upgrade, uninstall, reinstall, pack, new, which]
+        [Alias: -k]
     
     .PARAMETER FudgefilePath
         This will override looking for a default 'Fudgefile' at the root of the current path, and allow you to specify
         other files instead. This allows you to have multiple Fudgefiles
-    
+        [Actions: install, upgrade, uninstall, reinstall, pack, list, new, delete, prune, rebuild]
+        [Default: ./Fudgefile]
+        [Alias: -fp]
+
+    .PARAMETER Limit
+        This argument only applies for the 'search' action. It will limit the amount of packages returned when searching
+        If 0 is supplied, the full list is returned
+        [Actions: search]
+        [Default: 10]
+        [Alias: -l]
+
+    .PARAMETER Source
+        Passing this argument will allow you to specify custom source locations to get/download packages for Chocolatey.
+        This allows you to install packages from local directories, or from custom Chocolatey servers. Passing this will
+        also override the source specified in any Fudgefiles
+        [Default: Chocolatey's server]
+        [Actions: install, upgrade, reinstall, search, rebuild]
+        [Alias: -s]
+
     .PARAMETER Dev
         Switch parameter, if supplied will also action upon the devPackages in the Fudgefile
+        [Actions: install, upgrade, uninstall, reinstall, list, delete, prune, rebuild]
+        [Alias: -d]
+
+    .PARAMETER DevOnly
+        Switch parameter, if supplied will only action upon the devPackages in the Fudgefile
+        [Actions: install, upgrade, uninstall, reinstall, list, delete, prune, rebuild]
+        [Alias: -do]
+    
+    .PARAMETER Version
+        Switch parameter, if supplied will just display the current version of Fudge installed
+        [Alias: -v]
+
+    .PARAMETER Install
+        Switch parameter, if supplied will install packages after creating a new Fudgefile
+        [Actions: new]
+        [Alias: -i]
+    
+    .PARAMETER Uninstall
+        Switch parameter, if supplied will uninstall packages before deleting a Fudgefile
+        [Actions: delete]
+        [Alias: -u]
 
     .EXAMPLE
         fudge install
 
     .EXAMPLE
-        fudge upgrade -Dev
+        fudge install -d    # to also install devPackages (-do will only install devPackages)
     
     .EXAMPLE
         fudge pack website
+
+    .EXAMPLE
+        fudge list
+
+    .EXAMPLE
+        fudge search checksum
 #>
 param (
+    [Alias('a')]
     [string]
     $Action,
 
+    [Alias('k')]
     [string]
     $Key,
     
+    [Alias('fp')]
     [string]
     $FudgefilePath,
 
+    [Alias('l')]
+    [int]
+    $Limit = 10,
+
+    [Alias('s')]
+    [string]
+    $Source,
+
+    [Alias('d')]
     [switch]
     $Dev,
 
+    [Alias('do')]
+    [switch]
+    $DevOnly,
+
+    [Alias('i')]
+    [switch]
+    $Install,
+
+    [Alias('u')]
+    [switch]
+    $Uninstall,
+
+    [Alias('v')]
     [switch]
     $Version
 )
@@ -51,220 +128,14 @@ param (
 $ErrorActionPreference = 'Stop'
 
 
-# checks to see if the user has administrator priviledges
-function Test-AdminUser
-{
-    try
-    {
-        $principal = New-Object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
-
-        if ($principal -eq $null)
-        {
-            return $false
-        }
-
-        return $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
-    }
-    catch [exception]
-    {
-        Write-Host 'Error checking user administrator priviledges'
-        Write-Host $_.Exception.Message -ForegroundColor Red
-        return $false
-    }
-}
-
-# checks to see if the passed value is empty
-function Test-Empty
-{
-    param (
-        $Value
-    )
-
-    if ($Value -eq $null)
-    {
-        return $true
-    }
-
-    if ($Value.GetType().Name -ieq 'string')
-    {
-        return [string]::IsNullOrWhiteSpace($Value)
-    }
-
-    $type = $Value.GetType().BaseType.Name.ToLowerInvariant()
-    switch ($type)
-    {
-        'valuetype'
-            {
-                return $false
-            }
-
-        'array'
-            {
-                return (($Value | Measure-Object).Count -eq 0 -or $Value.Count -eq 0)
-            }
-    }
-
-    return ([string]::IsNullOrWhiteSpace($Value) -or ($Value | Measure-Object).Count -eq 0 -or $Value.Count -eq 0)
-}
-
-# cycle through the passed packages, actioning upon them
-function Start-ActionPackages
-{
-    param (
-        $Action,
-        $Packages
-    )
-
-    if (Test-Empty $Packages)
-    {
-        return
-    }
-
-    foreach ($name in $Packages.psobject.properties.name)
-    {
-        if (![string]::IsNullOrWhiteSpace($Key) -and $name -ine $Key)
-        {
-            continue
-        }
-
-        Invoke-Chocolatey -Action $Action -Package $name -Version ($Packages.$name)
-    }
-}
-
-# invokes a chocolatey action, which also runs the pre/post scripts
-function Invoke-ChocolateyAction
-{
-    param (
-        $Action,
-        $Config
-    )
-
-    # invoke pre-script for current action
-    Invoke-Script -Action $Action -Stage 'pre' -Scripts $Config.scripts
-
-    # invoke chocolatey based on the action
-    if ($Action -ieq 'pack')
-    {
-        Start-ActionPackages -Action $Action -Packages $Config.pack
-    }
-    else
-    {
-        Start-ActionPackages -Action $Action -Packages $Config.packages
-        if ($Dev)
-        {
-            Start-ActionPackages -Action $Action -Packages $Config.devPackages
-        }
-    }
-    
-    # invoke post-script for current action
-    Invoke-Script -Action $Action -Stage 'post' -Scripts $Config.scripts
-}
-
-# invoke scripts for pre/post actions
-function Invoke-Script
-{
-    param (
-        $Scripts,
-        $Action,
-        $Stage
-    )
-
-    # if there are no scripts, return
-    if ((Test-Empty $Scripts) -or (Test-Empty $Scripts.$Stage))
-    {
-        return
-    }
-
-    $script = $Scripts.$Stage.$Action
-    if ([string]::IsNullOrWhiteSpace($script))
-    {
-        return
-    }
-
-    # run the script
-    Invoke-Expression -Command $script
-}
-
-# invoke chocolate for the specific action
-function Invoke-Chocolatey
-{
-    param (
-        $Action,
-        $Package,
-        $Version
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Package))
-    {
-        return
-    }
-
-    switch ($Action.ToLowerInvariant())
-    {
-        'install'
-            {
-                if ([string]::IsNullOrWhiteSpace($Version) -or $Version -ieq 'latest')
-                {
-                    Write-Host "> Installing $($Package) (latest)" -ForegroundColor Magenta
-                    choco install $Package -y | Out-Null
-                }
-                else
-                {
-                    Write-Host "> Installing $($Package) v$($Version)" -ForegroundColor Magenta
-                    choco install $Package --version $Version -y | Out-Null
-                }
-            }
-        
-        'upgrade'
-            {
-                if ([string]::IsNullOrWhiteSpace($Version) -or $Version -ieq 'latest')
-                {
-                    Write-Host "> Upgrading $($Package) to latest" -ForegroundColor Magenta
-                    choco upgrade $Package -y | Out-Null
-                }
-                else
-                {
-                    Write-Host "> Upgrading $($Package) to v$($Version)" -ForegroundColor Magenta
-                    choco upgrade $Package --version $Version -y | Out-Null
-                }
-            }
-
-        'uninstall'
-            {
-                Write-Host "> Uninstalling $($Package)" -ForegroundColor Magenta
-                choco uninstall $Package -y -x | Out-Null
-            }
-
-        'pack'
-            {
-                Write-Host "> Packing $($Package)" -ForegroundColor Magenta
-                $path = Split-Path -Parent -Path $Version
-                $name = Split-Path -Leaf -Path $Version
-
-                try
-                {
-                    Push-Location $path
-                    choco pack $name | Out-Null
-                }
-                finally
-                {
-                    Pop-Location
-                }
-            }
-    }
-
-    if (!$?)
-    {
-        throw "Failed to $($Action) package: $($Package)"
-    }
-
-    Write-Host "$("$($Action)ed" -ireplace 'eed$', 'ed')" -ForegroundColor Green
-}
+# Import required modules
+$root = Split-Path -Parent -Path $MyInvocation.MyCommand.Path
+Import-Module "$($root)\Modules\FudgeTools.psm1" -ErrorAction Stop
 
 
 # output the version
 $ver = 'v$version$'
-Write-Host "Fudge $($ver)`n" -ForegroundColor Cyan
+Write-Success "Fudge $($ver)"
 
 # if we were only after the version, just return
 if ($Version)
@@ -280,91 +151,132 @@ try
 
 
     # ensure we have a valid action
-    $actions = @('install', 'upgrade', 'uninstall', 'reinstall', 'pack')
+    $packageActions = @('install', 'upgrade', 'uninstall', 'reinstall', 'list', 'rebuild')
+    $maintainActions = @('prune')
+    $packingActions = @('pack')
+    $miscActions = @('search', 'clean', 'which', 'help')
+    $newActions = @('new')
+    $alterActions = @('delete')
+    $actions = ($packageActions + $maintainActions + $packingActions + $miscActions + $newActions + $alterActions)
+
     if ((Test-Empty $Action) -or $actions -inotcontains $Action)
     {
-        Write-Host "Unrecognised action supplied '$($Action)', should be either: $($actions -join ', ')" -ForegroundColor Red
+        Write-Fail "Unrecognised action supplied '$($Action)', should be either: $($actions -join ', ')"
         return
     }
 
 
-    # ensure that the Fudgefile exists
-    $path = './Fudgefile'
-    if (![string]::IsNullOrWhiteSpace($FudgefilePath))
+    # if action is just to display Help, show it and return
+    if ($Action -ieq 'help')
     {
-        if ((Get-Item $FudgefilePath) -is [System.IO.DirectoryInfo])
+        Write-Host "`nUsage: fudge <action>"
+        Write-Host "`nWhere <action> is one of:"
+        Write-Host "    clean, delete, help, install, list, new, pack, prune,"
+        Write-Host "    rebuild, reinstall, search, uninstall, upgrade, which"
+        return
+    }
+
+
+    # if -devOnly is passed, set -dev to true
+    if ($DevOnly)
+    {
+        $Dev = $true
+    }
+
+
+    # get the Fudgefile path
+    $FudgefilePath = Get-FudgefilePath $FudgefilePath
+
+
+    # ensure that the Fudgefile exists (for certain actions), and deserialise it
+    if (($packageActions + $maintainActions + $packingActions + $alterActions) -icontains $Action)
+    {
+        if (!(Test-Path $FudgefilePath))
         {
-            $path = Join-Path $FudgefilePath 'Fudgefile'
+            throw "Path to Fudgefile does not exist: $($FudgefilePath)"
         }
-        else
+
+        $config = Get-FudgefileContent $FudgefilePath
+
+        # if we have a custom source in the config and no CLI source, set the source
+        if ((Test-Empty $Source) -and $config -ne $null -and !(Test-Empty $config.source))
         {
-            $path = $FudgefilePath
+            $Source = $config.source
         }
     }
 
-    if (!(Test-Path $path))
+    # ensure that the Fudgefile doesn't exist
+    elseif ($newActions -icontains $Action)
     {
-        Write-Host "Path to Fudgefile does not exist at: $($path)" -ForegroundColor Red
-        return
-    }
-
-
-    # deserialise the Fudgefile
-    $config = Get-Content -Path $path -Raw | ConvertFrom-Json
-    if (!$?)
-    {
-        Write-Host "Failed to parse the Fudgefile at: $($path)" -ForegroundColor Red
-        return
+        if (Test-Path $FudgefilePath)
+        {
+            throw "Path to Fudgefile already exists: $($FudgefilePath)"
+        }
     }
 
 
     # if there are no packages to install or pack, just return
-    if ($Action -ieq 'pack')
+    if ($packingActions -icontains $Action)
     {
         if (Test-Empty $config.pack)
         {
-            Write-Warning 'There are no nuspecs to pack'
+            Write-Notice "There are no nuspecs to $($Action)"
             return
         }
 
         if (![string]::IsNullOrWhiteSpace($Key) -and [string]::IsNullOrWhiteSpace($config.pack.$Key))
         {
-            Write-Warning "Fudgefile does not contain a nuspec pack file for '$($Key)'"
+            Write-Notice "Fudgefile does not contain a nuspec pack file for '$($Key)'"
             return
         }
     }
-    else
+    elseif ($packageActions -icontains $Action)
     {
         if ((Test-Empty $config.packages) -and (!$Dev -or ($Dev -and (Test-Empty $config.devPackages))))
         {
-            Write-Warning "There are no packages to $($Action)"
+            Write-Notice "There are no packages to $($Action)"
+            return
+        }
+
+        if ($DevOnly -and (Test-Empty $config.devPackages))
+        {
+            Write-Notice "There are no devPackages to $($Action)"
             return
         }
     }
 
 
-    # check if the console is elevated
-    if (!(Test-AdminUser))
+    # check to see if chocolatey is installed
+    $isChocoInstalled = Test-Chocolatey
+
+
+    # check if the console is elevated (only needs to be done for certain actions)
+    $isAdminAction = @('list', 'search', 'new', 'delete') -inotcontains $Action
+    $actionNeedsAdmin = ($Action -ieq 'delete' -and $Uninstall) -or ($Action -ieq 'new' -and $Install)
+
+    if ((!$isChocoInstalled -or $isAdminAction -or $actionNeedsAdmin) -and !(Test-AdminUser))
     {
-        Write-Warning 'Must be running with administrator priviledges for Fudge to fully function'
+        Write-Notice 'Must be running with administrator priviledges for Fudge to fully function'
         return
     }
 
 
-    # check to see if chocolatey is installed - else install it
-    powershell.exe /C "choco -v" | Out-Null
-    if ($LASTEXITCODE -ne 0)
+    # if chocolatey isn't installed, install it
+    if (!$isChocoInstalled)
     {
-        Write-Host "Installing Chocolatey" -ForegroundColor Yellow
+        Install-Chocolatey
+        $isChocoInstalled = $true
+    }
 
-        $policies = @('Unrestricted', 'ByPass', 'AllSigned')
-        if ($policies -inotcontains (Get-ExecutionPolicy))
-        {
-            Set-ExecutionPolicy  Bypass -Force
-        }
 
-        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')) | Out-Null
-        Write-Host "Chocolatey installed" -ForegroundColor Green
+    # if we are using a custom source, output it for info
+    if (!(Test-Empty $Source))
+    {
+        Write-Notice "Source: $($Source)`n"
+    }
+    else
+    {
+        Write-Host ([string]::Empty)
     }
 
 
@@ -373,22 +285,68 @@ try
     {
         {($_ -ieq 'install') -or ($_ -ieq 'uninstall') -or ($_ -ieq 'upgrade')}
             {
-                Invoke-ChocolateyAction -Action $Action -Config $config
+                Invoke-ChocolateyAction -Action $Action -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
             }
         
         {($_ -ieq 'reinstall')}
             {
-                Invoke-ChocolateyAction -Action 'uninstall' -Config $config
-                Invoke-ChocolateyAction -Action 'install' -Config $config
+                Invoke-ChocolateyAction -Action 'uninstall' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
+                Invoke-ChocolateyAction -Action 'install' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
             }
 
         {($_ -ieq 'pack')}
             {
-                Invoke-ChocolateyAction -Action 'pack' -Config $config
+                Invoke-ChocolateyAction -Action 'pack' -Key $Key -Config $config
+            }
+
+        {($_ -ieq 'list')}
+            {
+                $localList = Get-ChocolateyLocalList
+                Invoke-FudgeLocalDetails -Config $config -Key $Key -LocalList $localList -Dev:$Dev -DevOnly:$DevOnly
+            }
+
+        {($_ -ieq 'search')}
+            {
+                $localList = Get-ChocolateyLocalList
+                Invoke-Search -Key $Key -Limit $Limit -Source $Source -LocalList $localList
+            }
+
+        {($_ -ieq 'new')}
+            {
+                New-Fudgefile -Path $FudgefilePath -Key $Key -Install:$Install -Dev:$Dev -DevOnly:$DevOnly
+            }
+
+        {($_ -ieq 'delete')}
+            {
+                Remove-Fudgefile -Path $FudgefilePath -Uninstall:$Uninstall -Dev:$Dev -DevOnly:$DevOnly
+            }
+
+        {($_ -ieq 'prune')}
+            {
+                $localList = Get-ChocolateyLocalList
+                Invoke-FudgePrune -Config $config -LocalList $localList -Dev:$Dev -DevOnly:$DevOnly
+            }
+
+        {($_ -ieq 'clean')}
+            {
+                $localList = Get-ChocolateyLocalList
+                Invoke-FudgeClean -LocalList $localList
+            }
+
+        {($_ -ieq 'which')}
+            {
+                Invoke-FudgeWhich -Key $Key
+            }
+
+        {($_ -ieq 'rebuild')}
+            {
+                $localList = Get-ChocolateyLocalList
+                Invoke-FudgeClean -LocalList $localList
+                Invoke-ChocolateyAction -Action 'install' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
             }
     }
 }
 finally
 {
-    Write-Host "`nDuration: $(([DateTime]::UtcNow - $timer).ToString())" -ForegroundColor Cyan
+    Write-Details "`nDuration: $(([DateTime]::UtcNow - $timer).ToString())"
 }

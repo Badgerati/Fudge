@@ -8,6 +8,9 @@
         "checksum": "latest",
         "7zip.install": "latest"
     },
+    "devPackages": {
+        "pester": "latest"
+    },
     "pack": {
         "fudge": "./nuget-packages/choco/fudge.nuspec"
     }
