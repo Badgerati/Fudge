@@ -138,7 +138,7 @@ $ver = 'v$version$'
 Write-Success "Fudge $($ver)"
 
 # if we were only after the version, just return
-if ($Version)
+if ($Version -or (@('v', 'version') -icontains $Action))
 {
     return
 }
@@ -172,7 +172,8 @@ try
         Write-Host "`nUsage: fudge <action>"
         Write-Host "`nWhere <action> is one of:"
         Write-Host "    clean, delete, help, install, list, new, pack, prune,"
-        Write-Host "    rebuild, reinstall, search, uninstall, upgrade, which"
+        Write-Host "    rebuild, reinstall, search, uninstall, upgrade, version,"
+        Write-Host "    which"
         return
     }
 
