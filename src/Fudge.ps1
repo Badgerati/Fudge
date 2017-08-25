@@ -52,10 +52,6 @@
         Switch parameter, if supplied will only action upon the devPackages in the Fudgefile
         [Actions: install, upgrade, uninstall, reinstall, list, delete, prune, rebuild]
         [Alias: -do]
-    
-    .PARAMETER Version
-        Switch parameter, if supplied will just display the current version of Fudge installed
-        [Alias: -v]
 
     .PARAMETER Install
         Switch parameter, if supplied will install packages after creating a new Fudgefile
@@ -66,6 +62,14 @@
         Switch parameter, if supplied will uninstall packages before deleting a Fudgefile
         [Actions: delete]
         [Alias: -u]
+    
+    .PARAMETER Version
+        Switch parameter, if supplied will just display the current version of Fudge installed
+        [Alias: -v]
+    
+    .PARAMETER Help
+        Switch parameter, if supplied will just display help output
+        [Alias: -h]
 
     .EXAMPLE
         fudge install
@@ -121,7 +125,11 @@ param (
 
     [Alias('v')]
     [switch]
-    $Version
+    $Version,
+
+    [Alias('h')]
+    [switch]
+    $Help
 )
 
 # ensure if there's an error, we stop
@@ -144,6 +152,18 @@ if ($Version -or (@('v', 'version') -icontains $Action))
 }
 
 
+# if action is just to display Help, show it and return
+if ($Help -or (@('h', 'help') -icontains $Action))
+{
+    Write-Host "`nUsage: fudge <action>"
+    Write-Host "`nWhere <action> is one of:"
+    Write-Host "    clean, delete, help, install, list, new, pack, prune,"
+    Write-Host "    rebuild, reinstall, search, uninstall, upgrade, version,"
+    Write-Host "    which"
+    return
+}
+
+
 try
 {
     # start timer
@@ -154,7 +174,7 @@ try
     $packageActions = @('install', 'upgrade', 'uninstall', 'reinstall', 'list', 'rebuild')
     $maintainActions = @('prune')
     $packingActions = @('pack')
-    $miscActions = @('search', 'clean', 'which', 'help')
+    $miscActions = @('search', 'clean', 'which')
     $newActions = @('new')
     $alterActions = @('delete')
     $actions = ($packageActions + $maintainActions + $packingActions + $miscActions + $newActions + $alterActions)
@@ -162,18 +182,6 @@ try
     if ((Test-Empty $Action) -or $actions -inotcontains $Action)
     {
         Write-Fail "Unrecognised action supplied '$($Action)', should be either: $($actions -join ', ')"
-        return
-    }
-
-
-    # if action is just to display Help, show it and return
-    if ($Action -ieq 'help')
-    {
-        Write-Host "`nUsage: fudge <action>"
-        Write-Host "`nWhere <action> is one of:"
-        Write-Host "    clean, delete, help, install, list, new, pack, prune,"
-        Write-Host "    rebuild, reinstall, search, uninstall, upgrade, version,"
-        Write-Host "    which"
         return
     }
 
