@@ -294,7 +294,8 @@ function Remove-Fudgefile
     # ensure the path actually exists
     if (!(Test-Path $Path))
     {
-        throw "Path to Fudgefile does not exist: $($Path)"
+        Write-Fail "Path to Fudgefile does not exist: $($Path)"
+        return
     }
 
     # uninstall packages first, if requested
@@ -323,6 +324,8 @@ function New-Fudgefile
 
         [string]
         $Key,
+        
+        $LocalList,
 
         [switch]
         $Install,
@@ -334,29 +337,46 @@ function New-Fudgefile
         $DevOnly
     )
 
-    # if the key is passed, ensure it's a valid nuspec file
-    if (![string]::IsNullOrWhiteSpace($Key))
+    # check to see if we're making this file using local packages
+    if ($Key -ieq 'local')
+    {
+        if (Test-Empty $LocalList)
+        {
+            Write-Fail "No packages installed locally to create new Fudgefile"
+            return
+        }
+
+        Write-Information "> Creating new Fudgefile using $($LocalList.Count) local packages" -NoNewLine
+    }
+
+    # if the key is passed, ensure it's a valid nuspec file, or using local packages
+    elseif (![string]::IsNullOrWhiteSpace($Key))
     {
         if (!(Test-NuspecPath $Key))
         {
-            throw "Path to nuspec file doesn't exist or is invalid: $($Key)"
+            Write-Fail "Path to nuspec file doesn't exist or is invalid: $($Key)"
+            return
         }
 
         if (!(Test-XmlContent $Key))
         {
-            throw "Nuspec file fails to parse as a valid XML document: $($Key)"
+            Write-Fail "Nuspec file fails to parse as a valid XML document: $($Key)"
+            return
         }
 
         $nuspecData = Get-XmlContent $Key
 
         if (!(Test-NuspecContent $nuspecData))
         {
-            throw "Nuspec file is missing the package/metadata XML sections: $($Key)"
+            Write-Fail "Nuspec file is missing the package/metadata XML sections: $($Key)"
+            return
         }
 
         $nuspecName = Split-Path -Leaf -Path $Key
         Write-Information "> Creating new Fudgefile using $($nuspecName)" -NoNewLine
     }
+
+    # else it's just an empty file
     else
     {
         Write-Information "> Creating new Fudgefile" -NoNewLine
@@ -395,6 +415,14 @@ function New-Fudgefile
         # add the nuspec as a pack that can be packed
         $name = [System.IO.Path]::GetFileNameWithoutExtension($nuspecName)
         $fudge.pack[$name] = $Key
+    }
+
+    # insert any data from the local packages
+    if ($Key -ieq 'local')
+    {
+        $LocalList.Keys | ForEach-Object {
+            $fudge.packages[$_] = $LocalList[$_]
+        }
     }
 
     # save contents as json

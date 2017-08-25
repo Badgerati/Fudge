@@ -448,6 +448,7 @@ Describe 'Remove-Fudgefile' {
     Mock Write-Information { } -ModuleName FudgeTools
     Mock Write-Success { } -ModuleName FudgeTools
     Mock Write-Details { } -ModuleName FudgeTools
+    Mock Write-Fail { } -ModuleName FudgeTools
 
     Context 'When no path is passed' {
         It 'Should fail parameter validation for null' {
@@ -462,8 +463,9 @@ Describe 'Remove-Fudgefile' {
     Context 'When a path is passed' {
         It 'Should fail because the path does not exist' {
             Mock Test-Path { return $false } -ModuleName FudgeTools
-            { Remove-Fudgefile -Path 'fake' } | Should Throw 'Path to Fudgefile does not exist'
+            { Remove-Fudgefile -Path 'fake' } | Should Not Throw
             Assert-MockCalled Test-Path -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Fail -Times 1 -Scope It -ModuleName FudgeTools
         }
 
         It 'Should pass because the path exists' {
@@ -505,6 +507,7 @@ Describe 'New-Fudgefile' {
     Mock Write-Information { } -ModuleName FudgeTools
     Mock Write-Success { } -ModuleName FudgeTools
     Mock Write-Details { } -ModuleName FudgeTools
+    Mock Write-Fail { } -ModuleName FudgeTools
     Mock Out-File { } -ModuleName FudgeTools
     Mock Invoke-ChocolateyAction { } -ModuleName FudgeTools
 
@@ -547,13 +550,14 @@ Describe 'New-Fudgefile' {
             Mock Test-NuspecContent { return $true } -ModuleName FudgeTools
             Mock Get-XmlContent { return ([xml]'<root></root>') } -ModuleName FudgeTools
 
-            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Throw "Path to nuspec file doesn't exist"
+            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Not Throw
 
             Assert-MockCalled Test-NuspecPath -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Test-XmlContent -Times 0 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Test-NuspecContent -Times 0 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Get-XmlContent -Times 0 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Write-Information -Times 0 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Fail -Times 1 -Scope It -ModuleName FudgeTools
         }
 
         It 'Should fail for invalid XML content in nuspec file' {
@@ -562,13 +566,14 @@ Describe 'New-Fudgefile' {
             Mock Test-NuspecContent { return $true } -ModuleName FudgeTools
             Mock Get-XmlContent { return ([xml]'<root></root>') } -ModuleName FudgeTools
 
-            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Throw "Nuspec file fails to parse as a valid XML"
+            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Not Throw
 
             Assert-MockCalled Test-NuspecPath -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Test-XmlContent -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Test-NuspecContent -Times 0 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Get-XmlContent -Times 0 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Write-Information -Times 0 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Fail -Times 1 -Scope It -ModuleName FudgeTools
         }
 
         It 'Should fail for invalid nuspec content in file' {
@@ -577,13 +582,14 @@ Describe 'New-Fudgefile' {
             Mock Test-NuspecContent { return $false } -ModuleName FudgeTools
             Mock Get-XmlContent { return ([xml]'<root></root>') } -ModuleName FudgeTools
 
-            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Throw "Nuspec file is missing the package/metadata XML"
+            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Not Throw
 
             Assert-MockCalled Test-NuspecPath -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Test-XmlContent -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Test-NuspecContent -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Get-XmlContent -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Write-Information -Times 0 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Fail -Times 1 -Scope It -ModuleName FudgeTools
         }
 
         It 'Should create a populated template' {

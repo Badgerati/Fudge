@@ -193,7 +193,8 @@ try
     {
         if (!(Test-Path $FudgefilePath))
         {
-            throw "Path to Fudgefile does not exist: $($FudgefilePath)"
+            Write-Fail "Path to Fudgefile does not exist: $($FudgefilePath)"
+            return
         }
 
         $config = Get-FudgefileContent $FudgefilePath
@@ -210,7 +211,8 @@ try
     {
         if (Test-Path $FudgefilePath)
         {
-            throw "Path to Fudgefile already exists: $($FudgefilePath)"
+            Write-Fail "Path to Fudgefile already exists: $($FudgefilePath)"
+            return
         }
     }
 
@@ -313,7 +315,8 @@ try
 
         {($_ -ieq 'new')}
             {
-                New-Fudgefile -Path $FudgefilePath -Key $Key -Install:$Install -Dev:$Dev -DevOnly:$DevOnly
+                $localList = Get-ChocolateyLocalList
+                New-Fudgefile -Path $FudgefilePath -Key $Key -LocalList $localList -Install:$Install -Dev:$Dev -DevOnly:$DevOnly
             }
 
         {($_ -ieq 'delete')}
