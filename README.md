@@ -30,7 +30,7 @@ choco install fudge
 * You can reinstall all packages, or just in/un/reinstall all packages
 * Allows you to have mutliple nuspecs, which you can then pack one or all of with Fudge
 * See details about packages in a Fudgefile - such as which ones are installed or need upgrading
-* Create empty template Fudgefiles, or create them from nuspec files
+* Create empty template Fudgefiles, or create them from nuspec files or local packages
 * Prune the machine to remove packages not in a Fudgefile (except chocolatey/fudge obviously!)
 * Clean a machine of all packages installed (again, except chocolatey/fudge)
 
@@ -105,7 +105,7 @@ fudge reinstall         # reinstall one or all packages (runs uninstall then ins
 fudge pack <id>         # pack one or all nuspec files
 fudge list              # list information about packages in the Fudgefile
 fudge search <id>       # search chocolatey for packages, but results are sorted
-fudge new <nuspec>      # create an empty Fudgefile, or a populated one from a nuspec
+fudge new <path|local>  # create an empty Fudgefile, or a populated one from a nuspec/local
 fudge delete            # deletes a Fudgefile, with option of uninstalling packages first
 fudge prune             # uninstalls packages not in a Fudgefile (except choco/fudge)
 fudge clean             # uninstalls all packages currently installed (except choco/fudge)
@@ -154,6 +154,7 @@ fudge new                   # creates a new empty template Fudgefile at the curr
 fudge new <nuspec_path>     # creates a new template Fudgefile, with packages/pack populated
 fudge new -fp './custom'    # creates a new Fudgefile, but with a custom name
 fudge new <nuspec_path> -i  # create new template from a nuspec, then installs the packages
+fudge new local             # creates a new Fudgefile using the packages currently installed
 ```
 
 * To delete a Fudgefile:
