@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package>
+  <metadata>
+    <id>fudge</id>
+    <version>$version$</version>
+    <authors>Badgerati</authors>
+    <owners>Badgerati</owners>
+    <description>Fudge is a PowerShell tool to help manage software packages via Chocolatey for specific development projects. Think NPM and Bower, but for Chocolatey.</description>
+    <projectUrl>https://github.com/Badgerati/Fudge</projectUrl>
+    <tags>fudge powershell automation provision devops json windows software deployment packages</tags>
+    <copyright>Copyright 2017</copyright>
+    <licenseUrl>https://github.com/Badgerati/Fudge/blob/master/LICENSE.txt</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <iconUrl>https://cdn.rawgit.com/Badgerati/Fudge/master/images/icon.png</iconUrl>
+    <releaseNotes>https://github.com/Badgerati/Fudge/releases</releaseNotes>
+  </metadata>
+</package>
