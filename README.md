@@ -1,6 +1,10 @@
 # Fudge
 
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/Badgerati/Fudge/master/LICENSE.txt)
+[![Build status](https://ci.appveyor.com/api/projects/status/23t545fdqhash4tc/branch/develop?svg=true)](https://ci.appveyor.com/project/Badgerati/fudge/branch/develop)
+
+[![Chocolatey](https://img.shields.io/chocolatey/v/fudge.svg)](https://chocolatey.org/packages/fudge)
+[![Chocolatey](https://img.shields.io/chocolatey/dt/fudge.svg)](https://chocolatey.org/packages/fudge)
 
 Fudge is a PowerShell tool to help manage software packages via [Chocolatey](https://chocolatey.org) for specific development projects. Think NPM and Bower, but for Chocolatey.
 
