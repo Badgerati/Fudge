@@ -53,6 +53,23 @@ finally
     Pop-Location
 }
 
+# == NUGET =======================================================
+
+Write-Host "Building NuGet Package"
+Push-Location "./nuget-packages/nuget"
+
+try
+{
+    mkdir tools
+    (Get-Content 'fudge.nuspec') | ForEach-Object { $_ -replace '\$version\$', $build_version } | Set-Content 'fudge.nuspec'
+    Copy-Item -Path "$($workspace)/src/*" -Destination './tools' -Force -Recurse
+    nuget pack fudge.nuspec
+}
+finally
+{
+    Pop-Location
+}
+
 # == CHOCO =======================================================
 
 Write-Host "Building Package Checksum"
