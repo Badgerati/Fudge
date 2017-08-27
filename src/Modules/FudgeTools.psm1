@@ -125,6 +125,38 @@ function Get-Levenshtein
 }
 
 
+# checks to see if a passed path is a valid nuspec (path, xml, and content)
+function Test-Nuspec
+{
+    param (
+        [string]
+        $Path
+    )
+
+    if (!(Test-NuspecPath $Path))
+    {
+        Write-Fail "Path to nuspec file doesn't exist or is invalid: $($Path)"
+        return $false
+    }
+
+    if (!(Test-XmlContent $Path))
+    {
+        Write-Fail "Nuspec file fails to parse as a valid XML document: $($Path)"
+        return $false
+    }
+
+    $nuspecData = Get-XmlContent $Path
+
+    if (!(Test-NuspecContent $nuspecData))
+    {
+        Write-Fail "Nuspec file is missing the package/metadata XML sections: $($Path)"
+        return $false
+    }
+
+    return $true
+}
+
+
 # checks to see if a passed path is a valid nuspec file path
 function Test-NuspecPath
 {
@@ -313,6 +345,111 @@ function Remove-Fudgefile
 }
 
 
+# restores the packages of an existing fudgefile (either empty, from nuspec, or from local)
+function Restore-Fudgefile
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $Path,
+
+        [string]
+        $Key,
+        
+        $LocalList,
+
+        [switch]
+        $Install,
+
+        [switch]
+        $Uninstall,
+
+        [switch]
+        $Dev,
+
+        [switch]
+        $DevOnly
+    )
+
+    # retrieve the content of the current fudgefile
+    $content = Get-FudgefileContent $Path
+
+    # check to see if we're restoring this file using local packages
+    if ($Key -ieq 'local')
+    {
+        if (Test-Empty $LocalList)
+        {
+            Write-Fail "No packages installed locally to renew Fudgefile"
+            return
+        }
+
+        Write-Information "> Renewing Fudgefile using $($LocalList.Count) local packages" -NoNewLine
+    }
+
+    # check if there are any nuspecs in the pack section
+    if ($Key -ieq 'nuspec')
+    {
+        if (Test-Empty $content.pack)
+        {
+            Write-Fail "No nuspecs in pack section to renew Fudgefile"
+            return
+        }
+
+        Write-Information "> Renewing Fudgefile using nuspecs" -NoNewLine
+    }
+
+    # else we're renewing to an empty file
+    else
+    {
+        Write-Information "> Renewing Fudgefile" -NoNewLine
+    }
+
+    # first, uninstall the packages, if requested
+    if ($Uninstall)
+    {
+        Invoke-ChocolateyAction -Action 'uninstall' -Key $null -Config $content -Dev:$Dev -DevOnly:$DevOnly
+    }
+
+    # remove all current packages
+    if (!$DevOnly)
+    {
+        $content.packages = @{}
+    }
+
+    if ($Dev)
+    {
+        $content.devPackages = @{}
+    }
+    
+    # insert packages from any nuspecs in the pack section
+    if ($Key -ieq 'nuspec')
+    {
+        $nuspecs = $content.pack.psobject.properties.name
+        $nuspecs | ForEach-Object {
+            $content = Add-PackagesFromNuspec -Content $content -Path $content.pack.$_ -Dev:$Dev -DevOnly:$DevOnly
+        }
+    }
+
+    # insert any data from the local packages
+    if ($Key -ieq 'local')
+    {
+        $content = Add-PackagesFromLocal -Content $content -LocalList $LocalList -DevOnly:$DevOnly
+    }
+
+    # save contents as json
+    $content | ConvertTo-Json | Out-File -FilePath $Path -Encoding utf8 -Force
+    Write-Success " > renewed"
+    Write-Details "   > $($Path)"
+
+    # now install the packages
+    if ($Install)
+    {
+        Invoke-ChocolateyAction -Action 'upgrade' -Key $null -Config $content -Dev:$Dev -DevOnly:$DevOnly
+    }
+}
+
+
 # create a new empty fudgefile, or a new one from a nuspec file
 function New-Fudgefile
 {
@@ -349,26 +486,11 @@ function New-Fudgefile
         Write-Information "> Creating new Fudgefile using $($LocalList.Count) local packages" -NoNewLine
     }
 
-    # if the key is passed, ensure it's a valid nuspec file, or using local packages
+    # if the key is passed, ensure it's a valid nuspec file
     elseif (![string]::IsNullOrWhiteSpace($Key))
     {
-        if (!(Test-NuspecPath $Key))
+        if (!(Test-Nuspec $Key))
         {
-            Write-Fail "Path to nuspec file doesn't exist or is invalid: $($Key)"
-            return
-        }
-
-        if (!(Test-XmlContent $Key))
-        {
-            Write-Fail "Nuspec file fails to parse as a valid XML document: $($Key)"
-            return
-        }
-
-        $nuspecData = Get-XmlContent $Key
-
-        if (!(Test-NuspecContent $nuspecData))
-        {
-            Write-Fail "Nuspec file is missing the package/metadata XML sections: $($Key)"
             return
         }
 
@@ -394,25 +516,9 @@ function New-Fudgefile
     }
 
     # insert any data from the nuspec
-    if ($nuspecData -ne $null)
+    if (!(Test-Empty $nuspecName))
     {
-        $meta = $nuspecData.package.metadata
-
-        # if we have any dependencies, add them as packages
-        if ($meta.dependencies -ne $null)
-        {
-            $meta.dependencies.dependency | ForEach-Object {
-                $version = 'latest'
-                if (![string]::IsNullOrWhiteSpace($_.version))
-                {
-                    $version = $_.version
-                }
-
-                $fudge.packages[$_.id] = $version
-            }
-        }
-
-        # add the nuspec as a pack that can be packed
+        $fudge = Add-PackagesFromNuspec -Content $fudge -Path $Key -Dev:$Dev -DevOnly:$DevOnly
         $name = [System.IO.Path]::GetFileNameWithoutExtension($nuspecName)
         $fudge.pack[$name] = $Key
     }
@@ -420,9 +526,7 @@ function New-Fudgefile
     # insert any data from the local packages
     if ($Key -ieq 'local')
     {
-        $LocalList.Keys | ForEach-Object {
-            $fudge.packages[$_] = $LocalList[$_]
-        }
+        $fudge = Add-PackagesFromLocal -Content $fudge -LocalList $LocalList -DevOnly:$DevOnly
     }
 
     # save contents as json
@@ -430,12 +534,98 @@ function New-Fudgefile
     Write-Success " > created"
     Write-Details "   > $($Path)"
 
-    # now install the packages, if requested and if nuspec data was found
-    if ($Install -and $nuspecData -ne $null)
+    # now install the packages
+    if ($Install)
     {
         $config = Get-FudgefileContent $Path
-        Invoke-ChocolateyAction -Action 'install' -Key $null -Config $config -Dev:$Dev -DevOnly:$DevOnly
+        Invoke-ChocolateyAction -Action 'upgrade' -Key $null -Config $config -Dev:$Dev -DevOnly:$DevOnly
     }
+}
+
+
+# adds packages to a fudgefile from local packages
+function Add-PackagesFromLocal
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNull()]
+        $Content,
+
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNull()]
+        $LocalList,
+
+        [switch]
+        $DevOnly
+    )
+
+    $LocalList.Keys | ForEach-Object {
+        if ($DevOnly)
+        {
+            $Content.devPackages[$_] = $LocalList[$_]
+        }
+        else
+        {
+            $Content.packages[$_] = $LocalList[$_]
+        }
+    }
+
+    return $Content
+}
+
+
+# adds packages to a fudgefile from a nuspec file
+function Add-PackagesFromNuspec
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNull()]
+        $Content,
+
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        $Path,
+
+        [switch]
+        $Dev,
+
+        [switch]
+        $DevOnly
+    )
+
+    # get the content from the nuspec
+    $data = Get-XmlContent -Path $Path
+    $metadata = $data.package.metadata
+
+    # if we have any dependencies, add them as packages
+    if (!$DevOnly -and $metadata.dependencies -ne $null)
+    {
+        $metadata.dependencies.dependency | ForEach-Object {
+            $version = 'latest'
+            if (![string]::IsNullOrWhiteSpace($_.version))
+            {
+                $version = $_.version
+            }
+
+            $Content.packages[$_.id] = $version
+        }
+    }
+
+    # if we have any devDependencies, add them as devPackages
+    if ($Dev -and $metadata.devDependencies -ne $null)
+    {
+        $metadata.devDependencies.dependency | ForEach-Object {
+            $version = 'latest'
+            if (![string]::IsNullOrWhiteSpace($_.version))
+            {
+                $version = $_.version
+            }
+
+            $Content.devPackages[$_.id] = $version
+        }
+    }
+
+    return $Content
 }
 
 

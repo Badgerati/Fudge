@@ -104,18 +104,19 @@ And that's it!
 A normal call to Fudge will look as follows, assuming there's a Fudgefile at the current path:
 
 ```powershell
-fudge install           # install one or all packages (one if a package_id is passed)
-fudge upgrade           # upgrade one or all packages
-fudge uninstall         # uninstall one or all packages
-fudge reinstall         # reinstall one or all packages (runs uninstall then install)
-fudge pack <id>         # pack one or all nuspec files
-fudge list              # list information about packages in the Fudgefile
-fudge search <id>       # search chocolatey for packages, but results are sorted
-fudge new <path|local>  # create an empty Fudgefile, or a populated one from a nuspec/local
-fudge delete            # deletes a Fudgefile, with option of uninstalling packages first
-fudge prune             # uninstalls packages not in a Fudgefile (except choco/fudge)
-fudge clean             # uninstalls all packages currently installed (except choco/fudge)
-fudge rebuild           # rebuilds the machine by running "clean" then "install"
+fudge install               # install one or all packages (one if a package_id is passed)
+fudge upgrade               # upgrade one or all packages
+fudge uninstall             # uninstall one or all packages
+fudge reinstall             # reinstall one or all packages (runs uninstall then install)
+fudge pack <id>             # pack one or all nuspec files
+fudge list                  # list information about packages in the Fudgefile
+fudge search <id>           # search chocolatey for packages, but results are sorted
+fudge new <path|local>      # create an empty Fudgefile, or a populated one from a nuspec/local
+fudge renew <nuspec|local>  # restores  fudgefile packages to nuspecs/local or empty
+fudge delete                # deletes a Fudgefile, with option of uninstalling packages first
+fudge prune                 # uninstalls packages not in a Fudgefile (except choco/fudge)
+fudge clean                 # uninstalls all packages currently installed (except choco/fudge)
+fudge rebuild               # rebuilds the machine by running "clean" then "install"
 ```
 
 * To install developer only packages (also works with upgrade/uninstall/reinstall):
