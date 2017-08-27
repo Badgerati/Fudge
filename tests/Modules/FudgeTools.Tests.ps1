@@ -533,7 +533,7 @@ Describe 'New-Fudgefile' {
         }
 
         It 'Should create an empty template, and not run install' {
-            { New-Fudgefile -Path 'fake' -Install } | Should Not Throw
+            { New-Fudgefile -Path 'fake' -Install } | Should Throw 'Path to Fudgefile does not exist'
 
             Assert-MockCalled Write-Information -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Out-File -Times 1 -Scope It -ModuleName FudgeTools
