@@ -197,7 +197,6 @@ fudge rebuild -d              # rebuilding now also respects the devPackages
 ## Todo
 
 * Add feature to add/remove packages to the Fudgefile from the CLI/nuspec
-* Add feature to refresh a Fudgefile using the nuspecs in the pack section
 
 ## Bugs and Feature Requests
 
