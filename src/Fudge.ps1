@@ -363,6 +363,11 @@ try
                 Invoke-FudgeClean -LocalList $localList
                 Invoke-ChocolateyAction -Action 'install' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
             }
+
+        default
+            {
+                Write-Fail "Action not recognised: $($_)"
+            }
     }
 }
 finally
