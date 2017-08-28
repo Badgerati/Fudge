@@ -388,7 +388,7 @@ function Restore-Fudgefile
     }
 
     # check if there are any nuspecs in the pack section
-    if ($Key -ieq 'nuspec')
+    elseif ($Key -ieq 'nuspec')
     {
         if (Test-Empty $content.pack)
         {
@@ -397,6 +397,13 @@ function Restore-Fudgefile
         }
 
         Write-Information "> Renewing Fudgefile using nuspecs" -NoNewLine
+    }
+
+    # else if it's not empty, we don't know what they mean
+    elseif (!(Test-Empty $Key))
+    {
+        Write-Fail "Renew command not recognised: $($Key). Should be blank, or either local/nuspec"
+        return
     }
 
     # else we're renewing to an empty file
@@ -487,7 +494,7 @@ function New-Fudgefile
     }
 
     # if the key is passed, ensure it's a valid nuspec file
-    elseif (![string]::IsNullOrWhiteSpace($Key))
+    elseif (!(Test-Empty $Key))
     {
         if (!(Test-Nuspec $Key))
         {
