@@ -8,8 +8,6 @@
 [![NuGet](https://img.shields.io/nuget/v/fudge.svg?colorB=1a1c58)](https://www.nuget.org/packages/fudge/)
 [![NuGet](https://img.shields.io/nuget/dt/fudge.svg?colorB=1a1c58)](https://www.nuget.org/packages/fudge/)
 
-> v2.0.0 is in dev, and will contain non-backwards compatible changes in the Fudgefile (around packages/devPackages: #28)
-
 Fudge is a PowerShell tool to help manage software packages via [Chocolatey](https://chocolatey.org) for specific development projects. Think NPM and Bower, but for Chocolatey.
 
 If you find any bugs, or have any feature requests, please raise them in the GitHub issues tab.
@@ -75,14 +73,20 @@ Below is an example of what a `Fudgefile` looks like, with all components shown:
         }
     },
     "source": "<custom sources || blank for chocolatey || use -s arg>",
-    "packages": {
-        "curl": "latest",
-        "nodejs.install": "6.5.0"
-    },
-    "devPackages": {
-        "git.install": "latest",
-        "vim": "7.4.1641"
-    },
+    "packages": [
+        { "name": "curl" },
+        {
+            "name": "nodejs.install",
+            "version": "6.5.0"
+        }
+    ],
+    "devPackages": [
+        { "name": "git.install" },
+        {
+            "name": "vim",
+            "version": "7.4.1641"
+        }
+    ],
     "pack": {
         "website": "./nuspecs/website.nuspec",
         "service": "./nuspecs/service.nuspec"

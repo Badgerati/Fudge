@@ -125,6 +125,44 @@ function Get-Levenshtein
 }
 
 
+# safeguards a string, by return empty or a default if empty
+function Format-SafeguardString
+{
+    param (
+        [string]
+        $Value,
+
+        [string]
+        $Default = $null
+    )
+
+    if (!(Test-Empty))
+    {
+        return $Value
+    }
+
+    $Value = [string]::Empty
+    if (!(Test-Empty $Default))
+    {
+        $Value = $Default
+    }
+
+    return $Value
+}
+
+
+# checks to see if a passed version is to use the latest version
+function Test-VersionPassedIsLatest
+{
+    param (
+        [string]
+        $Version
+    )
+
+    return ((Test-Empty) -or $Version -ieq 'latest')
+}
+
+
 # checks to see if a passed path is a valid nuspec (path, xml, and content)
 function Test-Nuspec
 {
@@ -421,12 +459,12 @@ function Restore-Fudgefile
     # remove all current packages
     if (!$DevOnly)
     {
-        $content.packages = @{}
+        $content.packages = @()
     }
 
     if ($Dev)
     {
-        $content.devPackages = @{}
+        $content.devPackages = @()
     }
     
     # insert packages from any nuspecs in the pack section
@@ -512,32 +550,32 @@ function New-Fudgefile
     }
 
     # setup the empty fudgefile
-    $fudge = @{
+    $content = @{
         'scripts' = @{
             'pre' = @{ 'install'= ''; 'uninstall'= ''; 'upgrade'= ''; 'pack'= ''; };
             'post' = @{ 'install'= ''; 'uninstall'= ''; 'upgrade'= ''; 'pack'= ''; };
         };
-        'packages' = @{};
-        'devPackages' = @{};
+        'packages' = @();
+        'devPackages' = @();
         'pack' = @{};
     }
 
     # insert any data from the nuspec
     if (!(Test-Empty $nuspecName))
     {
-        $fudge = Add-PackagesFromNuspec -Content $fudge -Path $Key -Dev:$Dev -DevOnly:$DevOnly
+        $content = Add-PackagesFromNuspec -Content $content -Path $Key -Dev:$Dev -DevOnly:$DevOnly
         $name = [System.IO.Path]::GetFileNameWithoutExtension($nuspecName)
-        $fudge.pack[$name] = $Key
+        $content.pack[$name] = $Key
     }
 
     # insert any data from the local packages
     if ($Key -ieq 'local')
     {
-        $fudge = Add-PackagesFromLocal -Content $fudge -LocalList $LocalList -DevOnly:$DevOnly
+        $content = Add-PackagesFromLocal -Content $content -LocalList $LocalList -DevOnly:$DevOnly
     }
 
     # save contents as json
-    $fudge | ConvertTo-Json | Out-File -FilePath $Path -Encoding utf8 -Force
+    $content | ConvertTo-Json | Out-File -FilePath $Path -Encoding utf8 -Force
     Write-Success " > created"
     Write-Details "   > $($Path)"
 
@@ -567,13 +605,18 @@ function Add-PackagesFromLocal
     )
 
     $LocalList.Keys | ForEach-Object {
+        $package = @{
+            'name' = $_;
+            'version' = $LocalList[$_];
+        }
+
         if ($DevOnly)
         {
-            $Content.devPackages[$_] = $LocalList[$_]
+            $Content.devPackages += $package
         }
         else
         {
-            $Content.packages[$_] = $LocalList[$_]
+            $Content.packages += $packages
         }
     }
 
@@ -608,13 +651,11 @@ function Add-PackagesFromNuspec
     if (!$DevOnly -and $metadata.dependencies -ne $null)
     {
         $metadata.dependencies.dependency | ForEach-Object {
-            $version = 'latest'
-            if (![string]::IsNullOrWhiteSpace($_.version))
-            {
-                $version = $_.version
+            $version = Format-SafeguardString $_.version 'latest'
+            $Content.packages += @{
+                'name' = $_.id;
+                'version' = $version;
             }
-
-            $Content.packages[$_.id] = $version
         }
     }
 
@@ -622,13 +663,11 @@ function Add-PackagesFromNuspec
     if ($Dev -and $metadata.devDependencies -ne $null)
     {
         $metadata.devDependencies.dependency | ForEach-Object {
-            $version = 'latest'
-            if (![string]::IsNullOrWhiteSpace($_.version))
-            {
-                $version = $_.version
+            $version = Format-SafeguardString $_.version 'latest'
+            $Content.devPackages += @{
+                'name' = $_.id;
+                'version' = $version;
             }
-
-            $Content.devPackages[$_.id] = $version
         }
     }
 
@@ -780,6 +819,7 @@ function Start-ActionPackages
         [string]
         $Source,
 
+        [array]
         $Packages
     )
 
@@ -790,14 +830,20 @@ function Start-ActionPackages
     }
 
     # loop through each of the packages, and call chocolatey on them
-    foreach ($name in $Packages.psobject.properties.name)
+    foreach ($pkg in $Packages)
     {
-        if (![string]::IsNullOrWhiteSpace($Key) -and $name -ine $Key)
+        if (![string]::IsNullOrWhiteSpace($Key) -and ($pkg.name -ine $Key))
         {
             continue
         }
 
-        Invoke-Chocolatey -Action $Action -Package $name -Version ($Packages.$name) -Source $Source
+        if (![string]::IsNullOrWhiteSpace($pkg.source))
+        {
+            $Source = $pkg.source
+        }
+
+        Invoke-Chocolatey -Action $Action -Package $pkg.name -Version $pkg.version `
+            -Source $Source -Parameters $pkg.params -Arguments $pkg.args
     }
 }
 
@@ -896,12 +942,12 @@ function Invoke-FudgePrune
 
     if (!$DevOnly)
     {
-        $Config.packages.psobject.properties.name | ForEach-Object { $packages[$_] = $Config.packages.$_ }
+        $Config.packages | ForEach-Object { $packages[$_.name] = $_.version }
     }
 
     if ($Dev)
     {
-        $Config.devPackages.psobject.properties.name | ForEach-Object { $packages[$_] = $Config.devPackages.$_ }
+        $Config.devPackages | ForEach-Object { $packages[$_.name] = $_.version }
     }
 
     # add core chocolatey packages (and fudge)
@@ -981,7 +1027,7 @@ function Invoke-FudgeWhich
 
 
 # returns a source argument for chocolatey
-function Get-ChocolateySource
+function Format-ChocolateySource
 {
     param (
         [string]
@@ -997,6 +1043,40 @@ function Get-ChocolateySource
 }
 
 
+# returns a params argument for chocolatey
+function Format-ChocolateyParams
+{
+    param (
+        [string]
+        $Parameters
+    )
+
+    if (Test-Empty $Parameters)
+    {
+        return [string]::Empty
+    }
+
+    return "-params '$($Parameters)'"
+}
+
+
+# returns a version argument for chocolatey
+function Format-ChocolateyVersion
+{
+    param (
+        [string]
+        $Version
+    )
+
+    if (Test-VersionPassedIsLatest $Version)
+    {
+        return [string]::Empty
+    }
+
+    return "--version $($Version)"
+}
+
+
 # returns the list of search returns from chocolatey
 function Get-ChocolateySearchList
 {
@@ -1009,7 +1089,7 @@ function Get-ChocolateySearchList
     )
 
     # set the source if we have one
-    $Source = Get-ChocolateySource $Source
+    $Source = Format-ChocolateySource $Source
 
     $list = (choco search $Key $Source)
     if (!$?)
@@ -1214,12 +1294,12 @@ function Invoke-FudgeLocalDetails
 
     if (!$DevOnly)
     {
-        $Config.packages.psobject.properties.name | ForEach-Object { $packages[$_] = $Config.packages.$_ }
+        $Config.packages | ForEach-Object { $packages[$_.name] = $_.version }
     }
 
     if ($Dev)
     {
-        $Config.devPackages.psobject.properties.name | ForEach-Object { $packages[$_] = $Config.devPackages.$_ }
+        $Config.devPackages | ForEach-Object { $packages[$_.name] = $_.version }
     }
 
     # loop through packages
@@ -1230,7 +1310,7 @@ function Invoke-FudgeLocalDetails
 
             if ($LocalList.ContainsKey($_))
             {
-                if ($LocalList[$_] -ieq $version -or [string]::IsNullOrWhiteSpace($version) -or $version -ieq 'latest')
+                if ($LocalList[$_] -ieq $version -or (Test-VersionPassedIsLatest $version))
                 {
                     $installed[$_] = $version
                 }
@@ -1273,7 +1353,13 @@ function Invoke-Chocolatey
         $Version,
 
         [string]
-        $Source
+        $Source,
+
+        [string]
+        $Parameters,
+
+        [string]
+        $Arguments
     )
 
     # if there was no package passed, return
@@ -1283,43 +1369,34 @@ function Invoke-Chocolatey
     }
 
     # set the source from which to install/upgrade packages
-    $Source = Get-ChocolateySource $Source
+    $SourceArg = Format-ChocolateySource $Source
+
+    # set the parameters to pass
+    $ParametersArg = Format-ChocolateyParams $Parameters
+
+    # set the version to pass
+    $VersionArg = Format-ChocolateyVersion $Version
+    $Version = Format-SafeguardString $Version 'latest'
 
     # run chocolatey for appropriate action
     switch ($Action.ToLowerInvariant())
     {
         'install'
             {
-                if ((Test-Empty $Version) -or $Version -ieq 'latest')
-                {
-                    Write-Information "> Installing $($Package) (latest)" -NoNewLine
-                    $output = choco install $Package -y $Source
-                }
-                else
-                {
-                    Write-Information "> Installing $($Package) v$($Version)" -NoNewLine
-                    $output = choco install $Package --version $Version -y $Source
-                }
+                Write-Information "> Installing $($Package) ($($Version))" -NoNewLine
+                $output = choco install $Package $VersionArg -y $SourceArg $ParametersArg $Arguments
             }
-        
+
         'upgrade'
             {
-                if ((Test-Empty $Version) -or $Version -ieq 'latest')
-                {
-                    Write-Information "> Upgrading $($Package) to latest" -NoNewLine
-                    $output = choco upgrade $Package -y $Source
-                }
-                else
-                {
-                    Write-Information "> Upgrading $($Package) to v$($Version)" -NoNewLine
-                    $output = choco upgrade $Package --version $Version -y $Source
-                }
+                Write-Information "> Upgrading $($Package) to ($($Version))" -NoNewLine
+                $output = choco upgrade $Package $VersionArg -y $SourceArg $ParametersArg $Arguments
             }
 
         'uninstall'
             {
                 Write-Information "> Uninstalling $($Package)" -NoNewLine
-                $output = choco uninstall $Package -y -x
+                $output = choco uninstall $Package -y -x $ParametersArg $Arguments
             }
 
         'pack'
@@ -1331,7 +1408,7 @@ function Invoke-Chocolatey
                 try
                 {
                     Push-Location $path
-                    $output = choco pack $name
+                    $output = choco pack $name $Arguments
                 }
                 finally
                 {
