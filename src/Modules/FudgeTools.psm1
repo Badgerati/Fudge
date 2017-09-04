@@ -125,6 +125,76 @@ function Get-Levenshtein
 }
 
 
+# safeguards a string, by return empty or a default if empty
+function Format-SafeguardString
+{
+    param (
+        [string]
+        $Value,
+
+        [string]
+        $Default = $null
+    )
+
+    if (!(Test-Empty))
+    {
+        return $Value
+    }
+
+    $Value = [string]::Empty
+    if (!(Test-Empty $Default))
+    {
+        $Value = $Default
+    }
+
+    return $Value
+}
+
+
+# checks to see if a passed version is to use the latest version
+function Test-VersionPassedIsLatest
+{
+    param (
+        [string]
+        $Version
+    )
+
+    return ((Test-Empty) -or $Version -ieq 'latest')
+}
+
+
+# checks to see if a passed path is a valid nuspec (path, xml, and content)
+function Test-Nuspec
+{
+    param (
+        [string]
+        $Path
+    )
+
+    if (!(Test-NuspecPath $Path))
+    {
+        Write-Fail "Path to nuspec file doesn't exist or is invalid: $($Path)"
+        return $false
+    }
+
+    if (!(Test-XmlContent $Path))
+    {
+        Write-Fail "Nuspec file fails to parse as a valid XML document: $($Path)"
+        return $false
+    }
+
+    $nuspecData = Get-XmlContent $Path
+
+    if (!(Test-NuspecContent $nuspecData))
+    {
+        Write-Fail "Nuspec file is missing the package/metadata XML sections: $($Path)"
+        return $false
+    }
+
+    return $true
+}
+
+
 # checks to see if a passed path is a valid nuspec file path
 function Test-NuspecPath
 {
@@ -294,7 +364,8 @@ function Remove-Fudgefile
     # ensure the path actually exists
     if (!(Test-Path $Path))
     {
-        throw "Path to Fudgefile does not exist: $($Path)"
+        Write-Fail "Path to Fudgefile does not exist: $($Path)"
+        return
     }
 
     # uninstall packages first, if requested
@@ -312,6 +383,118 @@ function Remove-Fudgefile
 }
 
 
+# restores the packages of an existing fudgefile (either empty, from nuspec, or from local)
+function Restore-Fudgefile
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $Path,
+
+        [string]
+        $Key,
+        
+        $LocalList,
+
+        [switch]
+        $Install,
+
+        [switch]
+        $Uninstall,
+
+        [switch]
+        $Dev,
+
+        [switch]
+        $DevOnly
+    )
+
+    # retrieve the content of the current fudgefile
+    $content = Get-FudgefileContent $Path
+
+    # check to see if we're restoring this file using local packages
+    if ($Key -ieq 'local')
+    {
+        if (Test-Empty $LocalList)
+        {
+            Write-Fail "No packages installed locally to renew Fudgefile"
+            return
+        }
+
+        Write-Information "> Renewing Fudgefile using $($LocalList.Count) local packages" -NoNewLine
+    }
+
+    # check if there are any nuspecs in the pack section
+    elseif ($Key -ieq 'nuspec')
+    {
+        if (Test-Empty $content.pack)
+        {
+            Write-Fail "No nuspecs in pack section to renew Fudgefile"
+            return
+        }
+
+        Write-Information "> Renewing Fudgefile using nuspecs" -NoNewLine
+    }
+
+    # else if it's not empty, we don't know what they mean
+    elseif (!(Test-Empty $Key))
+    {
+        Write-Fail "Renew command not recognised: $($Key). Should be blank, or either local/nuspec"
+        return
+    }
+
+    # else we're renewing to an empty file
+    else
+    {
+        Write-Information "> Renewing Fudgefile" -NoNewLine
+    }
+
+    # first, uninstall the packages, if requested
+    if ($Uninstall)
+    {
+        Invoke-ChocolateyAction -Action 'uninstall' -Key $null -Config $content -Dev:$Dev -DevOnly:$DevOnly
+    }
+
+    # remove all current packages
+    if (!$DevOnly)
+    {
+        $content.packages = @()
+    }
+
+    if ($Dev)
+    {
+        $content.devPackages = @()
+    }
+    
+    # insert packages from any nuspecs in the pack section
+    if ($Key -ieq 'nuspec')
+    {
+        $nuspecs = $content.pack.psobject.properties.name
+        $nuspecs | ForEach-Object {
+            $content = Add-PackagesFromNuspec -Content $content -Path $content.pack.$_ -Dev:$Dev -DevOnly:$DevOnly
+        }
+    }
+
+    # insert any data from the local packages
+    if ($Key -ieq 'local')
+    {
+        $content = Add-PackagesFromLocal -Content $content -LocalList $LocalList -DevOnly:$DevOnly
+    }
+
+    # save contents as json
+    $content | ConvertTo-Json | Out-File -FilePath $Path -Encoding utf8 -Force
+    Write-Success " > renewed"
+    Write-Details "   > $($Path)"
+
+    # now install the packages
+    if ($Install)
+    {
+        Invoke-ChocolateyAction -Action 'upgrade' -Key $null -Config $content -Dev:$Dev -DevOnly:$DevOnly
+    }
+}
+
+
 # create a new empty fudgefile, or a new one from a nuspec file
 function New-Fudgefile
 {
@@ -323,6 +506,8 @@ function New-Fudgefile
 
         [string]
         $Key,
+        
+        $LocalList,
 
         [switch]
         $Install,
@@ -334,80 +519,159 @@ function New-Fudgefile
         $DevOnly
     )
 
-    # if the key is passed, ensure it's a valid nuspec file
-    if (![string]::IsNullOrWhiteSpace($Key))
+    # check to see if we're making this file using local packages
+    if ($Key -ieq 'local')
     {
-        if (!(Test-NuspecPath $Key))
+        if (Test-Empty $LocalList)
         {
-            throw "Path to nuspec file doesn't exist or is invalid: $($Key)"
+            Write-Fail "No packages installed locally to create new Fudgefile"
+            return
         }
 
-        if (!(Test-XmlContent $Key))
-        {
-            throw "Nuspec file fails to parse as a valid XML document: $($Key)"
-        }
+        Write-Information "> Creating new Fudgefile using $($LocalList.Count) local packages" -NoNewLine
+    }
 
-        $nuspecData = Get-XmlContent $Key
-
-        if (!(Test-NuspecContent $nuspecData))
+    # if the key is passed, ensure it's a valid nuspec file
+    elseif (!(Test-Empty $Key))
+    {
+        if (!(Test-Nuspec $Key))
         {
-            throw "Nuspec file is missing the package/metadata XML sections: $($Key)"
+            return
         }
 
         $nuspecName = Split-Path -Leaf -Path $Key
         Write-Information "> Creating new Fudgefile using $($nuspecName)" -NoNewLine
     }
+
+    # else it's just an empty file
     else
     {
         Write-Information "> Creating new Fudgefile" -NoNewLine
     }
 
     # setup the empty fudgefile
-    $fudge = @{
+    $content = @{
         'scripts' = @{
             'pre' = @{ 'install'= ''; 'uninstall'= ''; 'upgrade'= ''; 'pack'= ''; };
             'post' = @{ 'install'= ''; 'uninstall'= ''; 'upgrade'= ''; 'pack'= ''; };
         };
-        'packages' = @{};
-        'devPackages' = @{};
+        'packages' = @();
+        'devPackages' = @();
         'pack' = @{};
     }
 
     # insert any data from the nuspec
-    if ($nuspecData -ne $null)
+    if (!(Test-Empty $nuspecName))
     {
-        $meta = $nuspecData.package.metadata
-
-        # if we have any dependencies, add them as packages
-        if ($meta.dependencies -ne $null)
-        {
-            $meta.dependencies.dependency | ForEach-Object {
-                $version = 'latest'
-                if (![string]::IsNullOrWhiteSpace($_.version))
-                {
-                    $version = $_.version
-                }
-
-                $fudge.packages[$_.id] = $version
-            }
-        }
-
-        # add the nuspec as a pack that can be packed
+        $content = Add-PackagesFromNuspec -Content $content -Path $Key -Dev:$Dev -DevOnly:$DevOnly
         $name = [System.IO.Path]::GetFileNameWithoutExtension($nuspecName)
-        $fudge.pack[$name] = $Key
+        $content.pack[$name] = $Key
+    }
+
+    # insert any data from the local packages
+    if ($Key -ieq 'local')
+    {
+        $content = Add-PackagesFromLocal -Content $content -LocalList $LocalList -DevOnly:$DevOnly
     }
 
     # save contents as json
-    $fudge | ConvertTo-Json | Out-File -FilePath $Path -Encoding utf8 -Force
+    $content | ConvertTo-Json | Out-File -FilePath $Path -Encoding utf8 -Force
     Write-Success " > created"
     Write-Details "   > $($Path)"
 
-    # now install the packages, if requested and if nuspec data was found
-    if ($Install -and $nuspecData -ne $null)
+    # now install the packages
+    if ($Install)
     {
         $config = Get-FudgefileContent $Path
-        Invoke-ChocolateyAction -Action 'install' -Key $null -Config $config -Dev:$Dev -DevOnly:$DevOnly
+        Invoke-ChocolateyAction -Action 'upgrade' -Key $null -Config $config -Dev:$Dev -DevOnly:$DevOnly
     }
+}
+
+
+# adds packages to a fudgefile from local packages
+function Add-PackagesFromLocal
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNull()]
+        $Content,
+
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNull()]
+        $LocalList,
+
+        [switch]
+        $DevOnly
+    )
+
+    $LocalList.Keys | ForEach-Object {
+        $package = @{
+            'name' = $_;
+            'version' = $LocalList[$_];
+        }
+
+        if ($DevOnly)
+        {
+            $Content.devPackages += $package
+        }
+        else
+        {
+            $Content.packages += $packages
+        }
+    }
+
+    return $Content
+}
+
+
+# adds packages to a fudgefile from a nuspec file
+function Add-PackagesFromNuspec
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNull()]
+        $Content,
+
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        $Path,
+
+        [switch]
+        $Dev,
+
+        [switch]
+        $DevOnly
+    )
+
+    # get the content from the nuspec
+    $data = Get-XmlContent -Path $Path
+    $metadata = $data.package.metadata
+
+    # if we have any dependencies, add them as packages
+    if (!$DevOnly -and $metadata.dependencies -ne $null)
+    {
+        $metadata.dependencies.dependency | ForEach-Object {
+            $version = Format-SafeguardString $_.version 'latest'
+            $Content.packages += @{
+                'name' = $_.id;
+                'version' = $version;
+            }
+        }
+    }
+
+    # if we have any devDependencies, add them as devPackages
+    if ($Dev -and $metadata.devDependencies -ne $null)
+    {
+        $metadata.devDependencies.dependency | ForEach-Object {
+            $version = Format-SafeguardString $_.version 'latest'
+            $Content.devPackages += @{
+                'name' = $_.id;
+                'version' = $version;
+            }
+        }
+    }
+
+    return $Content
 }
 
 
@@ -555,6 +819,7 @@ function Start-ActionPackages
         [string]
         $Source,
 
+        [array]
         $Packages
     )
 
@@ -564,15 +829,33 @@ function Start-ActionPackages
         return
     }
 
+    # have we installed anything
+    $installed = $false
+    $haveKey = (![string]::IsNullOrWhiteSpace($Key))
+
     # loop through each of the packages, and call chocolatey on them
-    foreach ($name in $Packages.psobject.properties.name)
+    foreach ($pkg in $Packages)
     {
-        if (![string]::IsNullOrWhiteSpace($Key) -and $name -ine $Key)
+        if ($haveKey -and ($pkg.name -ine $Key))
         {
             continue
         }
 
-        Invoke-Chocolatey -Action $Action -Package $name -Version ($Packages.$name) -Source $Source
+        if (![string]::IsNullOrWhiteSpace($pkg.source))
+        {
+            $Source = $pkg.source
+        }
+
+        $installed = $true
+
+        Invoke-Chocolatey -Action $Action -Package $pkg.name -Version $pkg.version `
+            -Source $Source -Parameters $pkg.params -Arguments $pkg.args
+    }
+
+    # if we didn't install anything, and we have a key - say it isn't present in file
+    if (!$installed -and $haveKey)
+    {
+        Write-Notice "Package not found in Fudgefile: $($Key)"
     }
 }
 
@@ -613,18 +896,18 @@ function Invoke-ChocolateyAction
     # invoke chocolatey based on the action
     if ($Action -ieq 'pack')
     {
-        Start-ActionPackages -Action $Action -Packages $Config.pack -Source $Source
+        Start-ActionPackages -Action $Action -Key $Key -Packages $Config.pack -Source $Source
     }
     else
     {
         if (!$DevOnly)
         {
-            Start-ActionPackages -Action $Action -Packages $Config.packages -Source $Source
+            Start-ActionPackages -Action $Action -Key $Key -Packages $Config.packages -Source $Source
         }
 
         if ($Dev)
         {
-            Start-ActionPackages -Action $Action -Packages $Config.devPackages -Source $Source
+            Start-ActionPackages -Action $Action -Key $Key -Packages $Config.devPackages -Source $Source
         }
     }
     
@@ -671,12 +954,12 @@ function Invoke-FudgePrune
 
     if (!$DevOnly)
     {
-        $Config.packages.psobject.properties.name | ForEach-Object { $packages[$_] = $Config.packages.$_ }
+        $Config.packages | ForEach-Object { $packages[$_.name] = $_.version }
     }
 
     if ($Dev)
     {
-        $Config.devPackages.psobject.properties.name | ForEach-Object { $packages[$_] = $Config.devPackages.$_ }
+        $Config.devPackages | ForEach-Object { $packages[$_.name] = $_.version }
     }
 
     # add core chocolatey packages (and fudge)
@@ -756,7 +1039,7 @@ function Invoke-FudgeWhich
 
 
 # returns a source argument for chocolatey
-function Get-ChocolateySource
+function Format-ChocolateySource
 {
     param (
         [string]
@@ -772,6 +1055,40 @@ function Get-ChocolateySource
 }
 
 
+# returns a params argument for chocolatey
+function Format-ChocolateyParams
+{
+    param (
+        [string]
+        $Parameters
+    )
+
+    if (Test-Empty $Parameters)
+    {
+        return [string]::Empty
+    }
+
+    return "-params '$($Parameters)'"
+}
+
+
+# returns a version argument for chocolatey
+function Format-ChocolateyVersion
+{
+    param (
+        [string]
+        $Version
+    )
+
+    if (Test-VersionPassedIsLatest $Version)
+    {
+        return [string]::Empty
+    }
+
+    return "--version $($Version)"
+}
+
+
 # returns the list of search returns from chocolatey
 function Get-ChocolateySearchList
 {
@@ -784,7 +1101,7 @@ function Get-ChocolateySearchList
     )
 
     # set the source if we have one
-    $Source = Get-ChocolateySource $Source
+    $Source = Format-ChocolateySource $Source
 
     $list = (choco search $Key $Source)
     if (!$?)
@@ -989,12 +1306,12 @@ function Invoke-FudgeLocalDetails
 
     if (!$DevOnly)
     {
-        $Config.packages.psobject.properties.name | ForEach-Object { $packages[$_] = $Config.packages.$_ }
+        $Config.packages | ForEach-Object { $packages[$_.name] = $_.version }
     }
 
     if ($Dev)
     {
-        $Config.devPackages.psobject.properties.name | ForEach-Object { $packages[$_] = $Config.devPackages.$_ }
+        $Config.devPackages | ForEach-Object { $packages[$_.name] = $_.version }
     }
 
     # loop through packages
@@ -1005,7 +1322,7 @@ function Invoke-FudgeLocalDetails
 
             if ($LocalList.ContainsKey($_))
             {
-                if ($LocalList[$_] -ieq $version -or [string]::IsNullOrWhiteSpace($version) -or $version -ieq 'latest')
+                if ($LocalList[$_] -ieq $version -or (Test-VersionPassedIsLatest $version))
                 {
                     $installed[$_] = $version
                 }
@@ -1048,7 +1365,13 @@ function Invoke-Chocolatey
         $Version,
 
         [string]
-        $Source
+        $Source,
+
+        [string]
+        $Parameters,
+
+        [string]
+        $Arguments
     )
 
     # if there was no package passed, return
@@ -1058,43 +1381,34 @@ function Invoke-Chocolatey
     }
 
     # set the source from which to install/upgrade packages
-    $Source = Get-ChocolateySource $Source
+    $SourceArg = Format-ChocolateySource $Source
+
+    # set the parameters to pass
+    $ParametersArg = Format-ChocolateyParams $Parameters
+
+    # set the version to pass
+    $VersionArg = Format-ChocolateyVersion $Version
+    $Version = Format-SafeguardString $Version 'latest'
 
     # run chocolatey for appropriate action
     switch ($Action.ToLowerInvariant())
     {
         'install'
             {
-                if ((Test-Empty $Version) -or $Version -ieq 'latest')
-                {
-                    Write-Information "> Installing $($Package) (latest)" -NoNewLine
-                    $output = choco install $Package -y $Source
-                }
-                else
-                {
-                    Write-Information "> Installing $($Package) v$($Version)" -NoNewLine
-                    $output = choco install $Package --version $Version -y $Source
-                }
+                Write-Information "> Installing $($Package) ($($Version))" -NoNewLine
+                $output = choco install $Package $VersionArg -y $SourceArg $ParametersArg $Arguments
             }
-        
+
         'upgrade'
             {
-                if ((Test-Empty $Version) -or $Version -ieq 'latest')
-                {
-                    Write-Information "> Upgrading $($Package) to latest" -NoNewLine
-                    $output = choco upgrade $Package -y $Source
-                }
-                else
-                {
-                    Write-Information "> Upgrading $($Package) to v$($Version)" -NoNewLine
-                    $output = choco upgrade $Package --version $Version -y $Source
-                }
+                Write-Information "> Upgrading $($Package) to ($($Version))" -NoNewLine
+                $output = choco upgrade $Package $VersionArg -y $SourceArg $ParametersArg $Arguments
             }
 
         'uninstall'
             {
                 Write-Information "> Uninstalling $($Package)" -NoNewLine
-                $output = choco uninstall $Package -y -x
+                $output = choco uninstall $Package -y -x $ParametersArg $Arguments
             }
 
         'pack'
@@ -1106,7 +1420,7 @@ function Invoke-Chocolatey
                 try
                 {
                     Push-Location $path
-                    $output = choco pack $name
+                    $output = choco pack $name $Arguments
                 }
                 finally
                 {

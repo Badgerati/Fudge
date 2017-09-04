@@ -13,12 +13,23 @@
             "pack": "Write-Host 'Post-Packing'"
         }
     },
-    "packages": {
-        "curl": "latest"
-    },
-    "devPackages": {
-        "7zip.install": "latest"
-    },
+    "packages": [
+        {
+            "name": "curl",
+            "version": "latest"
+        },
+        {
+            "name": "python3",
+            "params": "",
+            "args": "--x86"
+        }
+    ],
+    "devPackages": [
+        {
+            "name": "7zip.install",
+            "version": "16.4.0.20170506"
+        }
+    ],
     "pack": {
         "website": "./nuspecs/website.nuspec",
         "service": "./nuspecs/service.nuspec"
