@@ -161,6 +161,7 @@ if ($Help -or (@('h', 'help') -icontains $Action))
     Write-Host "    clean, delete, help, install, list, new, pack, prune,"
     Write-Host "    rebuild, reinstall, renew, search, uninstall, upgrade,"
     Write-Host "    version, which"
+    Write-Host ""
     return
 }
 

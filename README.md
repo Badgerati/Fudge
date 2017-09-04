@@ -77,7 +77,10 @@ Below is an example of what a `Fudgefile` looks like, with all components shown:
         { "name": "curl" },
         {
             "name": "nodejs.install",
-            "version": "6.5.0"
+            "version": "6.5.0",
+            "source": "<custom source for this package>",
+            "params": "<package parameters for installer>",
+            "args": "<other arguments you wish to pass>"
         }
     ],
     "devPackages": [

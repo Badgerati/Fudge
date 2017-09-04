@@ -829,10 +829,14 @@ function Start-ActionPackages
         return
     }
 
+    # have we installed anything
+    $installed = $false
+    $haveKey = (![string]::IsNullOrWhiteSpace($Key))
+
     # loop through each of the packages, and call chocolatey on them
     foreach ($pkg in $Packages)
     {
-        if (![string]::IsNullOrWhiteSpace($Key) -and ($pkg.name -ine $Key))
+        if ($haveKey -and ($pkg.name -ine $Key))
         {
             continue
         }
@@ -842,8 +846,16 @@ function Start-ActionPackages
             $Source = $pkg.source
         }
 
+        $installed = $true
+
         Invoke-Chocolatey -Action $Action -Package $pkg.name -Version $pkg.version `
             -Source $Source -Parameters $pkg.params -Arguments $pkg.args
+    }
+
+    # if we didn't install anything, and we have a key - say it isn't present in file
+    if (!$installed -and $haveKey)
+    {
+        Write-Notice "Package not found in Fudgefile: $($Key)"
     }
 }
 
@@ -884,18 +896,18 @@ function Invoke-ChocolateyAction
     # invoke chocolatey based on the action
     if ($Action -ieq 'pack')
     {
-        Start-ActionPackages -Action $Action -Packages $Config.pack -Source $Source
+        Start-ActionPackages -Action $Action -Key $Key -Packages $Config.pack -Source $Source
     }
     else
     {
         if (!$DevOnly)
         {
-            Start-ActionPackages -Action $Action -Packages $Config.packages -Source $Source
+            Start-ActionPackages -Action $Action -Key $Key -Packages $Config.packages -Source $Source
         }
 
         if ($Dev)
         {
-            Start-ActionPackages -Action $Action -Packages $Config.devPackages -Source $Source
+            Start-ActionPackages -Action $Action -Key $Key -Packages $Config.devPackages -Source $Source
         }
     }
     
