@@ -872,7 +872,6 @@ function Start-ActionPack
         [string]
         $Key,
 
-        [array]
         $Nuspecs
     )
 
