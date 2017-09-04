@@ -161,6 +161,7 @@ if ($Help -or (@('h', 'help') -icontains $Action))
     Write-Host "    clean, delete, help, install, list, new, pack, prune,"
     Write-Host "    rebuild, reinstall, renew, search, uninstall, upgrade,"
     Write-Host "    version, which"
+    Write-Host ""
     return
 }
 
@@ -227,7 +228,7 @@ try
     }
 
 
-    # if there are no packages to install or pack, just return
+    # if there are no packages to install or nuspecs to pack, just return
     if ($packingActions -icontains $Action)
     {
         if (Test-Empty $config.pack)
@@ -281,15 +282,13 @@ try
     }
 
 
-    # if we are using a custom source, output it for info
+    # if we are using a global custom source, output it for info
     if (!(Test-Empty $Source))
     {
-        Write-Notice "Source: $($Source)`n"
+        Write-Notice "Source: $($Source)"
     }
-    else
-    {
-        Write-Host ([string]::Empty)
-    }
+
+    Write-Host ([string]::Empty)
 
 
     # invoke chocolatey based on the action required
