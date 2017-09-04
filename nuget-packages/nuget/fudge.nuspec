@@ -14,4 +14,7 @@
     <iconUrl>https://cdn.rawgit.com/Badgerati/Fudge/master/images/icon.png</iconUrl>
     <releaseNotes>https://github.com/Badgerati/Fudge/releases</releaseNotes>
   </metadata>
+  <files>
+    <file src="..\..\src\**" target="src" />
+  </files>
 </package>
