@@ -136,7 +136,7 @@ function Format-SafeguardString
         $Default = $null
     )
 
-    if (!(Test-Empty))
+    if (!(Test-Empty $Value))
     {
         return $Value
     }
@@ -1475,7 +1475,7 @@ function Invoke-Chocolatey
             }
     }
 
-    if (!$?)
+    if (!$? -or $LASTEXITCODE -ne 0)
     {
         $fail = $true
 
@@ -1495,6 +1495,7 @@ function Invoke-Chocolatey
 
         if ($fail)
         {
+            Write-Fail " > failed"
             Write-Notice "`n`n$($output)`n"
             throw "Failed to $($Action) package: $($Package)"
         }
