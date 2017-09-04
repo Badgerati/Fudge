@@ -878,6 +878,7 @@ Describe 'Start-ActionPackages' {
 Describe 'Invoke-ChocolateyAction' {
     Mock Invoke-Script { } -ModuleName FudgeTools
     Mock Start-ActionPackages { } -ModuleName FudgeTools
+    Mock Start-ActionPack { } -ModuleName FudgeTools
 
     Context 'When no action is passed' {
         It 'Should fail parameter validation for null' {
@@ -897,7 +898,7 @@ Describe 'Invoke-ChocolateyAction' {
         It 'Should call pre, post and action once for packing' {
             { Invoke-ChocolateyAction -Action 'pack' -Config @{} } | Should Not Throw
             Assert-MockCalled Invoke-Script -Times 2 -Scope It -ModuleName FudgeTools
-            Assert-MockCalled Start-ActionPackages -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Start-ActionPack -Times 1 -Scope It -ModuleName FudgeTools
         }
 
         It 'Should call pre, post and action once for install and no dev' {

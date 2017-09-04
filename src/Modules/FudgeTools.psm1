@@ -860,6 +860,53 @@ function Start-ActionPackages
 }
 
 
+# cycle through the passed nuspecs for packing via nuget
+function Start-ActionPack
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $Action,
+
+        [string]
+        $Key,
+
+        [array]
+        $Nuspecs
+    )
+
+    # if there are no nuspecs to deal with, return
+    if (Test-Empty $Nuspecs)
+    {
+        return
+    }
+
+    # have we packed anything
+    $packed = $false
+    $haveKey = (![string]::IsNullOrWhiteSpace($Key))
+
+    # loop through each of the nuspecs, and call chocolatey on them for packing
+    foreach ($pkg in $Nuspecs.psobject.properties.name)
+    {
+        if ($haveKey -and ($pkg -ine $Key))
+        {
+            continue
+        }
+
+        $packed = $true
+
+        Invoke-Chocolatey -Action $Action -Package $pkg -Version ($Nuspecs.$pkg)
+    }
+
+    # if we didn't pavk anything, and we have a key - say it isn't present in file
+    if (!$packed -and $haveKey)
+    {
+        Write-Notice "Nuspec not found in Fudgefile: $($Key)"
+    }
+}
+
+
 # invokes a chocolatey action, which also runs the pre/post scripts
 function Invoke-ChocolateyAction
 {
@@ -896,7 +943,7 @@ function Invoke-ChocolateyAction
     # invoke chocolatey based on the action
     if ($Action -ieq 'pack')
     {
-        Start-ActionPackages -Action $Action -Key $Key -Packages $Config.pack -Source $Source
+        Start-ActionPack -Action $Action -Key $Key -Nuspecs $Config.pack
     }
     else
     {
