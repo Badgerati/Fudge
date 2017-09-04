@@ -1,0 +1,35 @@
+version: 1.1.0.{build}
+os: Windows Server 2012
+
+branches:
+  except:
+    - gh-pages
+
+skip_tags: true
+
+install:
+  - cinst -y Pester --version 3.4.3
+
+build: off
+
+test_script:
+  - ps: |
+      # run the tests
+      $file = ".\TestsResults.xml"
+      $results = Invoke-Pester .\tests -OutputFormat NUnitXml -OutputFile $file -PassThru
+
+      # upload results
+      Write-Host "Uploading results for job ID '$($env:APPVEYOR_JOB_ID)''" -ForegroundColor Cyan
+      (New-Object 'System.Net.WebClient').UploadFile("https://ci.appveyor.com/api/testresults/nunit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path $file))
+      Write-Host 'Results uploaded' -ForegroundColor Green
+
+      # fail build if any tests failed
+      Write-Host 'Checking if any of the tests have failed'
+      if ($results.FailedCount -gt 0) {
+        Write-Host 'Some of the tests have failed' -ForegroundColor Red
+        Push-AppveyorArtifact $file
+        throw "$($results.FailedCount) tests failed."
+      }
+      else {
+        Write-Host 'No tests failed!' -ForegroundColor Green
+      }
