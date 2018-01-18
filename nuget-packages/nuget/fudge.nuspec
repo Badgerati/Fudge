@@ -15,6 +15,6 @@
     <releaseNotes>https://github.com/Badgerati/Fudge/releases</releaseNotes>
   </metadata>
   <files>
-    <file src="..\..\src\**" target="src" />
+    <file src="..\..\src\**" target="tools" />
   </files>
 </package>
