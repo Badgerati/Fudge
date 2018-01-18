@@ -53,6 +53,21 @@ finally
     Pop-Location
 }
 
+# == NUGET =======================================================
+
+Write-Host "Building NuGet Package"
+Push-Location "./nuget-packages/nuget"
+
+try
+{
+    (Get-Content 'fudge.nuspec') | ForEach-Object { $_ -replace '\$version\$', $build_version } | Set-Content 'fudge.nuspec'
+    nuget pack fudge.nuspec
+}
+finally
+{
+    Pop-Location
+}
+
 # == CHOCO =======================================================
 
 Write-Host "Building Package Checksum"

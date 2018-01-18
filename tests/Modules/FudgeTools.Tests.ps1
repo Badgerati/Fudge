@@ -448,6 +448,7 @@ Describe 'Remove-Fudgefile' {
     Mock Write-Information { } -ModuleName FudgeTools
     Mock Write-Success { } -ModuleName FudgeTools
     Mock Write-Details { } -ModuleName FudgeTools
+    Mock Write-Fail { } -ModuleName FudgeTools
 
     Context 'When no path is passed' {
         It 'Should fail parameter validation for null' {
@@ -462,8 +463,9 @@ Describe 'Remove-Fudgefile' {
     Context 'When a path is passed' {
         It 'Should fail because the path does not exist' {
             Mock Test-Path { return $false } -ModuleName FudgeTools
-            { Remove-Fudgefile -Path 'fake' } | Should Throw 'Path to Fudgefile does not exist'
+            { Remove-Fudgefile -Path 'fake' } | Should Not Throw
             Assert-MockCalled Test-Path -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Fail -Times 1 -Scope It -ModuleName FudgeTools
         }
 
         It 'Should pass because the path exists' {
@@ -505,6 +507,7 @@ Describe 'New-Fudgefile' {
     Mock Write-Information { } -ModuleName FudgeTools
     Mock Write-Success { } -ModuleName FudgeTools
     Mock Write-Details { } -ModuleName FudgeTools
+    Mock Write-Fail { } -ModuleName FudgeTools
     Mock Out-File { } -ModuleName FudgeTools
     Mock Invoke-ChocolateyAction { } -ModuleName FudgeTools
 
@@ -530,7 +533,7 @@ Describe 'New-Fudgefile' {
         }
 
         It 'Should create an empty template, and not run install' {
-            { New-Fudgefile -Path 'fake' -Install } | Should Not Throw
+            { New-Fudgefile -Path 'fake' -Install } | Should Throw 'Path to Fudgefile does not exist'
 
             Assert-MockCalled Write-Information -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Out-File -Times 1 -Scope It -ModuleName FudgeTools
@@ -547,13 +550,14 @@ Describe 'New-Fudgefile' {
             Mock Test-NuspecContent { return $true } -ModuleName FudgeTools
             Mock Get-XmlContent { return ([xml]'<root></root>') } -ModuleName FudgeTools
 
-            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Throw "Path to nuspec file doesn't exist"
+            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Not Throw
 
             Assert-MockCalled Test-NuspecPath -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Test-XmlContent -Times 0 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Test-NuspecContent -Times 0 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Get-XmlContent -Times 0 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Write-Information -Times 0 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Fail -Times 1 -Scope It -ModuleName FudgeTools
         }
 
         It 'Should fail for invalid XML content in nuspec file' {
@@ -562,13 +566,14 @@ Describe 'New-Fudgefile' {
             Mock Test-NuspecContent { return $true } -ModuleName FudgeTools
             Mock Get-XmlContent { return ([xml]'<root></root>') } -ModuleName FudgeTools
 
-            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Throw "Nuspec file fails to parse as a valid XML"
+            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Not Throw
 
             Assert-MockCalled Test-NuspecPath -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Test-XmlContent -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Test-NuspecContent -Times 0 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Get-XmlContent -Times 0 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Write-Information -Times 0 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Fail -Times 1 -Scope It -ModuleName FudgeTools
         }
 
         It 'Should fail for invalid nuspec content in file' {
@@ -577,13 +582,14 @@ Describe 'New-Fudgefile' {
             Mock Test-NuspecContent { return $false } -ModuleName FudgeTools
             Mock Get-XmlContent { return ([xml]'<root></root>') } -ModuleName FudgeTools
 
-            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Throw "Nuspec file is missing the package/metadata XML"
+            { New-Fudgefile -Path 'fake' -Key 'fake/path.nuspec' } | Should Not Throw
 
             Assert-MockCalled Test-NuspecPath -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Test-XmlContent -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Test-NuspecContent -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Get-XmlContent -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Write-Information -Times 0 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Write-Fail -Times 1 -Scope It -ModuleName FudgeTools
         }
 
         It 'Should create a populated template' {
@@ -826,41 +832,41 @@ Describe 'Start-ActionPackages' {
         }
 
         It 'Should call chocolatey once for one package' {
-            $packages = '{"package1":""}' | ConvertFrom-Json
+            $packages = '{"pkgs": [{"name": "package1"}]}' | ConvertFrom-Json
             Mock Test-Empty { return $false } -ModuleName FudgeTools
 
-            { Start-ActionPackages -Action 'action' -Packages $packages } | Should Not Throw
+            { Start-ActionPackages -Action 'action' -Packages $packages.pkgs } | Should Not Throw
 
             Assert-MockCalled Test-Empty -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Invoke-Chocolatey -Times 1 -Scope It -ModuleName FudgeTools
         }
 
         It 'Should call chocolatey once for one package and custom source' {
-            $packages = '{"package1":""}' | ConvertFrom-Json
+            $packages = '{"pkgs": [{"name": "package1"}]}' | ConvertFrom-Json
             Mock Test-Empty { return $false } -ModuleName FudgeTools
             Mock Invoke-Chocolatey { } -ModuleName FudgeTools -ParameterFilter { $Source -ieq 'custom' }
 
-            { Start-ActionPackages -Action 'action' -Packages $packages -Source 'custom' } | Should Not Throw
+            { Start-ActionPackages -Action 'action' -Packages $packages.pkgs -Source 'custom' } | Should Not Throw
 
             Assert-MockCalled Test-Empty -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Invoke-Chocolatey -Times 1 -Scope It -ModuleName FudgeTools -ParameterFilter { $Source -ieq 'custom' }
         }
 
         It 'Should call chocolatey thrice for three package' {
-            $packages = '{"package1":"","package2":"","package3":""}' | ConvertFrom-Json
+            $packages = '{"pkgs": [{"name": "package1"},{"name": "package2"},{"name": "package3"}]}' | ConvertFrom-Json
             Mock Test-Empty { return $false } -ModuleName FudgeTools
 
-            { Start-ActionPackages -Action 'action' -Packages $packages } | Should Not Throw
+            { Start-ActionPackages -Action 'action' -Packages $packages.pkgs } | Should Not Throw
 
             Assert-MockCalled Test-Empty -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Invoke-Chocolatey -Times 3 -Scope It -ModuleName FudgeTools
         }
 
         It 'Should call chocolatey once for three package, with key passed' {
-            $packages = '{"package1":"","package2":"","package3":""}' | ConvertFrom-Json
+            $packages = '{"pkgs": [{"name": "package1"},{"name": "package2"},{"name": "package3"}]}' | ConvertFrom-Json
             Mock Test-Empty { return $false } -ModuleName FudgeTools
 
-            { Start-ActionPackages -Action 'action' -Key 'package2' -Packages $packages } | Should Not Throw
+            { Start-ActionPackages -Action 'action' -Key 'package2' -Packages $packages.pkgs } | Should Not Throw
 
             Assert-MockCalled Test-Empty -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Invoke-Chocolatey -Times 1 -Scope It -ModuleName FudgeTools
@@ -872,6 +878,7 @@ Describe 'Start-ActionPackages' {
 Describe 'Invoke-ChocolateyAction' {
     Mock Invoke-Script { } -ModuleName FudgeTools
     Mock Start-ActionPackages { } -ModuleName FudgeTools
+    Mock Start-ActionPack { } -ModuleName FudgeTools
 
     Context 'When no action is passed' {
         It 'Should fail parameter validation for null' {
@@ -891,7 +898,7 @@ Describe 'Invoke-ChocolateyAction' {
         It 'Should call pre, post and action once for packing' {
             { Invoke-ChocolateyAction -Action 'pack' -Config @{} } | Should Not Throw
             Assert-MockCalled Invoke-Script -Times 2 -Scope It -ModuleName FudgeTools
-            Assert-MockCalled Start-ActionPackages -Times 1 -Scope It -ModuleName FudgeTools
+            Assert-MockCalled Start-ActionPack -Times 1 -Scope It -ModuleName FudgeTools
         }
 
         It 'Should call pre, post and action once for install and no dev' {
@@ -915,26 +922,26 @@ Describe 'Invoke-ChocolateyAction' {
 }
 
 
-Describe 'Get-ChocolateySource' {
+Describe 'Format-ChocolateySource' {
     Context 'When getting a Chocolatey source parameter' {
         It 'Should return empty for no source' {
-            Get-ChocolateySource | Should Be ([string]::Empty)
+            Format-ChocolateySource | Should Be ([string]::Empty)
         }
         
         It 'Should return empty for null source' {
-            Get-ChocolateySource -Source $null | Should Be ([string]::Empty)
+            Format-ChocolateySource -Source $null | Should Be ([string]::Empty)
         }
         
         It 'Should return empty for empty source' {
-            Get-ChocolateySource -Source ([string]::Empty) | Should Be ([string]::Empty)
+            Format-ChocolateySource -Source ([string]::Empty) | Should Be ([string]::Empty)
         }
 
         It 'Should return a parameter string for a local source' {
-            Get-ChocolateySource -Source '.' | Should Be "-s '.'"
+            Format-ChocolateySource -Source '.' | Should Be "-s '.'"
         }
 
         It 'Should return a parameter string for a URL source' {
-            Get-ChocolateySource -Source 'http://test.repo.com' | Should Be "-s 'http://test.repo.com'"
+            Format-ChocolateySource -Source 'http://test.repo.com' | Should Be "-s 'http://test.repo.com'"
         }
     }
 }

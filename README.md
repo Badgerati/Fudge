@@ -1,6 +1,12 @@
 # Fudge
 
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/Badgerati/Fudge/master/LICENSE.txt)
+[![Build status](https://ci.appveyor.com/api/projects/status/23t545fdqhash4tc/branch/develop?svg=true)](https://ci.appveyor.com/project/Badgerati/fudge/branch/develop)
+
+[![Chocolatey](https://img.shields.io/chocolatey/v/fudge.svg?colorB=a1301c)](https://chocolatey.org/packages/fudge)
+[![Chocolatey](https://img.shields.io/chocolatey/dt/fudge.svg?label=downloads&colorB=a1301c)](https://chocolatey.org/packages/fudge)
+[![NuGet](https://img.shields.io/nuget/v/fudge.svg?colorB=1a1c58)](https://www.nuget.org/packages/fudge/)
+[![NuGet](https://img.shields.io/nuget/dt/fudge.svg?colorB=1a1c58)](https://www.nuget.org/packages/fudge/)
 
 Fudge is a PowerShell tool to help manage software packages via [Chocolatey](https://chocolatey.org) for specific development projects. Think NPM and Bower, but for Chocolatey.
 
@@ -30,7 +36,7 @@ choco install fudge
 * You can reinstall all packages, or just in/un/reinstall all packages
 * Allows you to have mutliple nuspecs, which you can then pack one or all of with Fudge
 * See details about packages in a Fudgefile - such as which ones are installed or need upgrading
-* Create empty template Fudgefiles, or create them from nuspec files
+* Create empty template Fudgefiles, or create them from nuspec files or local packages
 * Prune the machine to remove packages not in a Fudgefile (except chocolatey/fudge obviously!)
 * Clean a machine of all packages installed (again, except chocolatey/fudge)
 
@@ -66,15 +72,24 @@ Below is an example of what a `Fudgefile` looks like, with all components shown:
             "pack": "<command or file-path>"
         }
     },
-    "source": "<custom source || blank for chocolatey || use -s arg>",
-    "packages": {
-        "curl": "latest",
-        "nodejs.install": "6.5.0"
-    },
-    "devPackages": {
-        "git.install": "latest",
-        "vim": "7.4.1641"
-    },
+    "source": "<custom sources || blank for chocolatey || use -s arg>",
+    "packages": [
+        { "name": "curl" },
+        {
+            "name": "nodejs.install",
+            "version": "6.5.0",
+            "source": "<custom source for this package>",
+            "params": "<package parameters for installer>",
+            "args": "<other arguments you wish to pass>"
+        }
+    ],
+    "devPackages": [
+        { "name": "git.install" },
+        {
+            "name": "vim",
+            "version": "7.4.1641"
+        }
+    ],
     "pack": {
         "website": "./nuspecs/website.nuspec",
         "service": "./nuspecs/service.nuspec"
@@ -98,18 +113,19 @@ And that's it!
 A normal call to Fudge will look as follows, assuming there's a Fudgefile at the current path:
 
 ```powershell
-fudge install           # install one or all packages (one if a package_id is passed)
-fudge upgrade           # upgrade one or all packages
-fudge uninstall         # uninstall one or all packages
-fudge reinstall         # reinstall one or all packages (runs uninstall then install)
-fudge pack <id>         # pack one or all nuspec files
-fudge list              # list information about packages in the Fudgefile
-fudge search <id>       # search chocolatey for packages, but results are sorted
-fudge new <nuspec>      # create an empty Fudgefile, or a populated one from a nuspec
-fudge delete            # deletes a Fudgefile, with option of uninstalling packages first
-fudge prune             # uninstalls packages not in a Fudgefile (except choco/fudge)
-fudge clean             # uninstalls all packages currently installed (except choco/fudge)
-fudge rebuild           # rebuilds the machine by running "clean" then "install"
+fudge install               # install one or all packages (one if a package_id is passed)
+fudge upgrade               # upgrade one or all packages
+fudge uninstall             # uninstall one or all packages
+fudge reinstall             # reinstall one or all packages (runs uninstall then install)
+fudge pack <id>             # pack one or all nuspec files
+fudge list                  # list information about packages in the Fudgefile
+fudge search <id>           # search chocolatey for packages, but results are sorted
+fudge new <path|local>      # create an empty Fudgefile, or a populated one from a nuspec/local
+fudge renew <nuspec|local>  # restores  fudgefile packages to nuspecs/local or empty
+fudge delete                # deletes a Fudgefile, with option of uninstalling packages first
+fudge prune                 # uninstalls packages not in a Fudgefile (except choco/fudge)
+fudge clean                 # uninstalls all packages currently installed (except choco/fudge)
+fudge rebuild               # rebuilds the machine by running "clean" then "install"
 ```
 
 * To install developer only packages (also works with upgrade/uninstall/reinstall):
@@ -154,6 +170,7 @@ fudge new                   # creates a new empty template Fudgefile at the curr
 fudge new <nuspec_path>     # creates a new template Fudgefile, with packages/pack populated
 fudge new -fp './custom'    # creates a new Fudgefile, but with a custom name
 fudge new <nuspec_path> -i  # create new template from a nuspec, then installs the packages
+fudge new local             # creates a new Fudgefile using the packages currently installed
 ```
 
 * To delete a Fudgefile:
@@ -189,7 +206,6 @@ fudge rebuild -d              # rebuilding now also respects the devPackages
 ## Todo
 
 * Add feature to add/remove packages to the Fudgefile from the CLI/nuspec
-* Add feature to refresh a Fudgefile using the nuspecs in the pack section
 
 ## Bugs and Feature Requests
 

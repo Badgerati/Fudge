@@ -4,13 +4,13 @@
             "pack": "./pack.ps1"
         }
     },
-    "packages": {
-        "checksum": "latest",
-        "7zip.install": "latest"
-    },
-    "devPackages": {
-        "pester": "latest"
-    },
+    "packages": [
+        { "name": "checksum" },
+        { "name": "7zip.install" }
+    ],
+    "devPackages": [
+        { "name": "pester" }
+    ],
     "pack": {
         "fudge": "./nuget-packages/choco/fudge.nuspec"
     }

@@ -13,18 +13,19 @@
     
     .PARAMETER Action
         The action that Fudge should undertake
-        Actions: install, upgrade, uninstall, reinstall, pack, list, search, new, delete, prune, clean, rebuild, which, help
+        Actions: install, upgrade, uninstall, reinstall, pack, list, search, new, delete, prune, clean, rebuild,
+                 which, help, renew
         [Alias: -a]
 
     .PARAMETER Key
         The key represents a package/nuspec name in the Fudgefile
-        [Actions: install, upgrade, uninstall, reinstall, pack, new, which]
+        [Actions: install, upgrade, uninstall, reinstall, pack, new, which, renew]
         [Alias: -k]
     
     .PARAMETER FudgefilePath
         This will override looking for a default 'Fudgefile' at the root of the current path, and allow you to specify
         other files instead. This allows you to have multiple Fudgefiles
-        [Actions: install, upgrade, uninstall, reinstall, pack, list, new, delete, prune, rebuild]
+        [Actions: install, upgrade, uninstall, reinstall, pack, list, new, delete, prune, rebuild, renew]
         [Default: ./Fudgefile]
         [Alias: -fp]
 
@@ -52,20 +53,24 @@
         Switch parameter, if supplied will only action upon the devPackages in the Fudgefile
         [Actions: install, upgrade, uninstall, reinstall, list, delete, prune, rebuild]
         [Alias: -do]
-    
-    .PARAMETER Version
-        Switch parameter, if supplied will just display the current version of Fudge installed
-        [Alias: -v]
 
     .PARAMETER Install
         Switch parameter, if supplied will install packages after creating a new Fudgefile
-        [Actions: new]
+        [Actions: new, renew]
         [Alias: -i]
     
     .PARAMETER Uninstall
         Switch parameter, if supplied will uninstall packages before deleting a Fudgefile
-        [Actions: delete]
+        [Actions: delete, renew]
         [Alias: -u]
+    
+    .PARAMETER Version
+        Switch parameter, if supplied will just display the current version of Fudge installed
+        [Alias: -v]
+    
+    .PARAMETER Help
+        Switch parameter, if supplied will just display help output
+        [Alias: -h]
 
     .EXAMPLE
         fudge install
@@ -121,7 +126,11 @@ param (
 
     [Alias('v')]
     [switch]
-    $Version
+    $Version,
+
+    [Alias('h')]
+    [switch]
+    $Help
 )
 
 # ensure if there's an error, we stop
@@ -138,8 +147,21 @@ $ver = 'v$version$'
 Write-Success "Fudge $($ver)"
 
 # if we were only after the version, just return
-if ($Version)
+if ($Version -or (@('v', 'version') -icontains $Action))
 {
+    return
+}
+
+
+# if action is just to display Help, show it and return
+if ($Help -or (@('h', 'help') -icontains $Action))
+{
+    Write-Host "`nUsage: fudge <action>"
+    Write-Host "`nWhere <action> is one of:"
+    Write-Host "    clean, delete, help, install, list, new, pack, prune,"
+    Write-Host "    rebuild, reinstall, renew, search, uninstall, upgrade,"
+    Write-Host "    version, which"
+    Write-Host ""
     return
 }
 
@@ -154,25 +176,14 @@ try
     $packageActions = @('install', 'upgrade', 'uninstall', 'reinstall', 'list', 'rebuild')
     $maintainActions = @('prune')
     $packingActions = @('pack')
-    $miscActions = @('search', 'clean', 'which', 'help')
+    $miscActions = @('search', 'clean', 'which')
     $newActions = @('new')
-    $alterActions = @('delete')
+    $alterActions = @('delete', 'renew')
     $actions = ($packageActions + $maintainActions + $packingActions + $miscActions + $newActions + $alterActions)
 
     if ((Test-Empty $Action) -or $actions -inotcontains $Action)
     {
         Write-Fail "Unrecognised action supplied '$($Action)', should be either: $($actions -join ', ')"
-        return
-    }
-
-
-    # if action is just to display Help, show it and return
-    if ($Action -ieq 'help')
-    {
-        Write-Host "`nUsage: fudge <action>"
-        Write-Host "`nWhere <action> is one of:"
-        Write-Host "    clean, delete, help, install, list, new, pack, prune,"
-        Write-Host "    rebuild, reinstall, search, uninstall, upgrade, which"
         return
     }
 
@@ -193,7 +204,8 @@ try
     {
         if (!(Test-Path $FudgefilePath))
         {
-            throw "Path to Fudgefile does not exist: $($FudgefilePath)"
+            Write-Fail "Path to Fudgefile does not exist: $($FudgefilePath)"
+            return
         }
 
         $config = Get-FudgefileContent $FudgefilePath
@@ -210,12 +222,13 @@ try
     {
         if (Test-Path $FudgefilePath)
         {
-            throw "Path to Fudgefile already exists: $($FudgefilePath)"
+            Write-Fail "Path to Fudgefile already exists: $($FudgefilePath)"
+            return
         }
     }
 
 
-    # if there are no packages to install or pack, just return
+    # if there are no packages to install or nuspecs to pack, just return
     if ($packingActions -icontains $Action)
     {
         if (Test-Empty $config.pack)
@@ -251,8 +264,8 @@ try
 
 
     # check if the console is elevated (only needs to be done for certain actions)
-    $isAdminAction = @('list', 'search', 'new', 'delete') -inotcontains $Action
-    $actionNeedsAdmin = ($Action -ieq 'delete' -and $Uninstall) -or ($Action -ieq 'new' -and $Install)
+    $isAdminAction = @('list', 'search', 'new', 'delete', 'renew') -inotcontains $Action
+    $actionNeedsAdmin = ($Action -ieq 'delete' -and $Uninstall) -or (@('new', 'renew') -icontains $Action -and $Install)
 
     if ((!$isChocoInstalled -or $isAdminAction -or $actionNeedsAdmin) -and !(Test-AdminUser))
     {
@@ -269,15 +282,13 @@ try
     }
 
 
-    # if we are using a custom source, output it for info
+    # if we are using a global custom source, output it for info
     if (!(Test-Empty $Source))
     {
-        Write-Notice "Source: $($Source)`n"
+        Write-Notice "Source: $($Source)"
     }
-    else
-    {
-        Write-Host ([string]::Empty)
-    }
+
+    Write-Host ([string]::Empty)
 
 
     # invoke chocolatey based on the action required
@@ -313,7 +324,14 @@ try
 
         {($_ -ieq 'new')}
             {
-                New-Fudgefile -Path $FudgefilePath -Key $Key -Install:$Install -Dev:$Dev -DevOnly:$DevOnly
+                $localList = Get-ChocolateyLocalList
+                New-Fudgefile -Path $FudgefilePath -Key $Key -LocalList $localList -Install:$Install -Dev:$Dev -DevOnly:$DevOnly
+            }
+
+        {($_ -ieq 'renew')}
+            {
+                $localList = Get-ChocolateyLocalList
+                Restore-Fudgefile -Path $FudgefilePath -Key $Key -LocalList $localList -Install:$Install -Uninstall:$Uninstall -Dev:$Dev -DevOnly:$DevOnly
             }
 
         {($_ -ieq 'delete')}
@@ -344,9 +362,15 @@ try
                 Invoke-FudgeClean -LocalList $localList
                 Invoke-ChocolateyAction -Action 'install' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
             }
+
+        default
+            {
+                Write-Fail "Action not recognised: $($_)"
+            }
     }
 }
 finally
 {
     Write-Details "`nDuration: $(([DateTime]::UtcNow - $timer).ToString())"
+    Remove-Module -Name 'FudgeTools' -ErrorAction SilentlyContinue | Out-Null
 }
