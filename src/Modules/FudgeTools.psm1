@@ -159,7 +159,7 @@ function Test-VersionPassedIsLatest
         $Version
     )
 
-    return ((Test-Empty) -or $Version -ieq 'latest')
+    return ((Test-Empty $Version) -or $Version -ieq 'latest')
 }
 
 
@@ -616,7 +616,7 @@ function Add-PackagesFromLocal
         }
         else
         {
-            $Content.packages += $packages
+            $Content.packages += $package
         }
     }
 
@@ -1489,7 +1489,7 @@ function Invoke-Chocolatey
 
             {($_ -ieq 'install')}
                 {
-                    $fail = !($output -ilike '*has been successfully installed*')
+                    $fail = !($output -ilike '*has been successfully installed*' -or $output -ilike '*has been installed*')
                 }
         }
 
