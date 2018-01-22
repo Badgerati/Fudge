@@ -31,7 +31,11 @@ finally
 
 Write-Host "Copying scripts into package"
 
-New-Item -ItemType Directory -Path './Package/src'
+if (!(Test-Path './Package/src'))
+{
+    New-Item -ItemType Directory -Path './Package/src'
+}
+
 Copy-Item -Path './src/Modules' -Destination './Package/src/' -Force -Recurse
 Copy-Item -Path './src/Fudge.ps1' -Destination './Package/src/' -Force
 
