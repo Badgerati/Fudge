@@ -820,42 +820,52 @@ function Start-ActionPackages
         $Source,
 
         [array]
-        $Packages
+        $Packages,
+
+        [switch]
+        $Adhoc
     )
 
-    # if there are no packages to deal with, return
-    if (Test-Empty $Packages)
+    # if there are no packages to deal with and adhoc not supplied, return
+    if (!$Adhoc -and (Test-Empty $Packages))
     {
         return
     }
 
-    # have we installed anything
-    $installed = $false
-    $haveKey = (![string]::IsNullOrWhiteSpace($Key))
-
-    # loop through each of the packages, and call chocolatey on them
-    foreach ($pkg in $Packages)
+    if ($Adhoc)
     {
-        if ($haveKey -and ($pkg.name -ine $Key))
-        {
-            continue
-        }
-
-        if (![string]::IsNullOrWhiteSpace($pkg.source))
-        {
-            $Source = $pkg.source
-        }
-
-        $installed = $true
-
-        Invoke-Chocolatey -Action $Action -Package $pkg.name -Version $pkg.version `
-            -Source $Source -Parameters $pkg.params -Arguments $pkg.args
+        Invoke-Chocolatey -Action $Action -Package $Key -Source $Source        
     }
-
-    # if we didn't install anything, and we have a key - say it isn't present in file
-    if (!$installed -and $haveKey)
+    else
     {
-        Write-Notice "Package not found in Fudgefile: $($Key)"
+        # have we installed anything
+        $installed = $false
+        $haveKey = (![string]::IsNullOrWhiteSpace($Key))
+
+        # loop through each of the packages, and call chocolatey on them
+        foreach ($pkg in $Packages)
+        {
+            if ($haveKey -and ($pkg.name -ine $Key))
+            {
+                continue
+            }
+
+            if (![string]::IsNullOrWhiteSpace($pkg.source))
+            {
+                $Source = $pkg.source
+            }
+
+            $installed = $true
+
+            Invoke-Chocolatey -Action $Action -Package $pkg.name -Version $pkg.version `
+                -Source $Source -Parameters $pkg.params -Arguments $pkg.args
+        }
+
+        # if we didn't install anything, and we have a key - say it isn't present in file
+        if (!$installed -and $haveKey)
+        {
+            Write-Notice "Package not found in Fudgefile: $($Key)"
+        }
     }
 }
 
@@ -927,17 +937,23 @@ function Invoke-ChocolateyAction
         $Dev,
 
         [switch]
-        $DevOnly
+        $DevOnly,
+
+        [switch]
+        $Adhoc
     )
 
-    # ensure the config object exists
-    if ($Config -eq $null)
+    # ensure the config object exists, unless adhoc is supplied
+    if (!$Adhoc -and $Config -eq $null)
     {
         throw "Invalid Fudge configuration supplied"
     }
 
-    # invoke pre-script for current action
-    Invoke-Script -Action $Action -Stage 'pre' -Scripts $Config.scripts
+    # invoke pre-script for current action, unless adhoc
+    if (!$Adhoc)
+    {
+        Invoke-Script -Action $Action -Stage 'pre' -Scripts $Config.scripts
+    }
 
     # invoke chocolatey based on the action
     if ($Action -ieq 'pack')
@@ -948,17 +964,24 @@ function Invoke-ChocolateyAction
     {
         if (!$DevOnly)
         {
-            Start-ActionPackages -Action $Action -Key $Key -Packages $Config.packages -Source $Source
+            Start-ActionPackages -Action $Action -Key $Key -Packages $Config.packages -Source $Source -Adhoc:$Adhoc
         }
 
-        if ($Dev)
+        if ($Adhoc -and $Dev)
+        {
+            Write-Notice "Cannot supply dev/devOnly and adhoc together"
+        }
+        elseif ($Dev)
         {
             Start-ActionPackages -Action $Action -Key $Key -Packages $Config.devPackages -Source $Source
         }
     }
     
     # invoke post-script for current action
-    Invoke-Script -Action $Action -Stage 'post' -Scripts $Config.scripts
+    if (!$Adhoc)
+    {
+        Invoke-Script -Action $Action -Stage 'post' -Scripts $Config.scripts
+    }
 }
 
 
