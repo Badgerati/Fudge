@@ -1137,7 +1137,7 @@ function Format-ChocolateyParams
         return [string]::Empty
     }
 
-    return "-params '$($Parameters)'"
+    return "--params='$($Parameters)'"
 }
 
 
