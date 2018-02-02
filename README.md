@@ -38,9 +38,9 @@ Install-Package fudge
 * Uses a Fudgefile to control required software
 * Allows you to version control required software to run websites, services and applications
 * Ability to run pre/post install/upgrade/uninstall/pack scripts
-* Can seperate out developer specific software which aren't needed for certain environments
+* Can separate out developer specific software which aren't needed for certain environments
 * You can reinstall all packages, or just in/un/reinstall all packages
-* Allows you to have mutliple nuspecs, which you can then pack one or all of with Fudge
+* Allows you to have multiple nuspecs, which you can then pack one or all of with Fudge
 * See details about packages in a Fudgefile - such as which ones are installed or need upgrading
 * Create empty template Fudgefiles, or create them from nuspec files or local packages
 * Prune the machine to remove packages not in a Fudgefile (except chocolatey/fudge obviously!)
@@ -51,11 +51,11 @@ Install-Package fudge
 Fudge is a PowerShell tool to help manage software packages via Chocolatey for specific development projects. Think NPM and Bower, but for Chocolatey.
 
 Fudge uses a `Fudgefile` to control what software to install, upgrade or uninstall. You can define specific versions of software or just use the latest version.
-Fudge also allows you to separate out specfic developer only software - which are only needed for developer/QA environments.
+Fudge also allows you to separate out specific developer only software - which are only needed for developer/QA environments.
 
-You can also define pre/post install/upgrade/uninstall scritps that need to be run. For example, you could install `redis` and have a `post install` script which sets up REDIS locally.
+You can also define pre/post install/upgrade/uninstall scripts that need to be run. For example, you could install `redis` and have a `post install` script which sets up REDIS locally.
 
-Fudge can also run `choco pack` on your nuspec files; allowing you to have mutliple nuspecs and then running `fudge pack website` for example, to pack your `website.nuspec`.
+Fudge can also run `choco pack` on your nuspec files; allowing you to have multiple nuspecs and then running `fudge pack website` for example, to pack your `website.nuspec`.
 Just running `fudge pack` will pack everything.
 
 ## Example Fudgefile
@@ -145,6 +145,7 @@ fudge install -devOnly  # this will only install from the devPackages
 
 ```powershell
 fudge install 7zip.install
+fudge install 7zip.install -ad  # will adhoc install 7zip without checking Fudgefile
 ```
 
 * To pack one or all of your nuspec files:
