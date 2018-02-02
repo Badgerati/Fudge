@@ -78,6 +78,42 @@ function Write-Fail
 }
 
 
+# compares two versions, and returns a value specifying if they're equal or different
+# -1: installed version is behind
+#  0: installed version is latest
+#  1: installed version is ahead
+function Compare-Versions($installed, $online)
+{
+    $i_parts = $installed -split '\.'
+    $o_parts = $online -split '\.'
+    
+    $count = $i_parts.Length
+    if ($o_parts.Length -gt $count)
+    {
+        $count = $o_parts.Length
+    }
+
+    for ($i = 0; $i -lt $count; $i++)
+    {
+        if ($i_parts[$i] -eq $o_parts[$i])
+        {
+            continue
+        }
+        
+        if ($i_parts[$i] -lt $o_parts[$i])
+        {
+            return -1
+        }
+        else
+        {
+            return 1
+        }
+    }
+
+    return 0
+}
+
+
 # returns the levenshtein distance between two strings
 function Get-Levenshtein
 {
@@ -560,8 +596,8 @@ function New-Fudgefile
     # setup the empty fudgefile
     $content = @{
         'scripts' = @{
-            'pre' = @{ 'install'= ''; 'uninstall'= ''; 'upgrade'= ''; 'pack'= ''; };
-            'post' = @{ 'install'= ''; 'uninstall'= ''; 'upgrade'= ''; 'pack'= ''; };
+            'pre' = @{ 'install'= ''; 'uninstall'= ''; 'upgrade'= ''; 'downgrade' = ''; 'pack'= ''; };
+            'post' = @{ 'install'= ''; 'uninstall'= ''; 'upgrade'= ''; 'downgrade' = ''; 'pack'= ''; };
         };
         'packages' = @();
         'devPackages' = @();
@@ -1457,7 +1493,7 @@ function Invoke-Chocolatey
         return
     }
 
-    # set the source from which to install/upgrade packages
+    # set the source from which to install/upgrade/downgrade packages
     $SourceArg = Format-ChocolateySource $Source
 
     # set the parameters to pass
@@ -1480,6 +1516,12 @@ function Invoke-Chocolatey
             {
                 Write-Information "> Upgrading $($Package) to ($($Version))" -NoNewLine
                 $output = choco upgrade $Package $VersionArg -y $SourceArg $ParametersArg $Arguments
+            }
+
+        'downgrade'
+            {
+                Write-Information "> Downgrading $($Package) to ($($Version))" -NoNewLine
+                $output = choco upgrade $Package $VersionArg -y $SourceArg $ParametersArg $Arguments --allow-downgrade
             }
 
         'uninstall'
@@ -1518,7 +1560,7 @@ function Invoke-Chocolatey
                     $fail = !($output -ilike '*has been successfully uninstalled*' -or $output -ilike '*Cannot uninstall a non-existent package*')
                 }
 
-            {($_ -ieq 'install')}
+            {($_ -ieq 'install') -or ($_ -ieq 'upgrade') -or ($_ -ieq 'downgrade')}
                 {
                     $fail = !($output -ilike '*has been successfully installed*' -or $output -ilike '*has been installed*')
                 }

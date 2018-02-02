@@ -7,25 +7,25 @@
         This is done via a Fudgefile which allows you to specify packages (and their versions) to install. You can also
         specify dev-specific packages (like git, or fiddler)
 
-        You are also able to define pre/post install/upgrade/uninstall scripts for additional required functionality
+        You are also able to define pre/post install/upgrade/downgrade/uninstall scripts for additional required functionality
 
         Furthermore, Fudge has a section to allow you to specify multiple nuspec files and pack the one you need
     
     .PARAMETER Action
         The action that Fudge should undertake
-        Actions: install, upgrade, uninstall, reinstall, pack, list, search, new, delete, prune, clean, rebuild,
+        Actions: install, upgrade, downgrade, uninstall, reinstall, pack, list, search, new, delete, prune, clean, rebuild,
                  which, help, renew
         [Alias: -a]
 
     .PARAMETER Key
         The key represents a package/nuspec name in the Fudgefile
-        [Actions: install, upgrade, uninstall, reinstall, pack, new, which, renew]
+        [Actions: install, upgrade, downgrade, uninstall, reinstall, pack, new, which, renew]
         [Alias: -k]
     
     .PARAMETER FudgefilePath
         This will override looking for a default 'Fudgefile' at the root of the current path, and allow you to specify
         other files instead. This allows you to have multiple Fudgefiles
-        [Actions: install, upgrade, uninstall, reinstall, pack, list, new, delete, prune, rebuild, renew]
+        [Actions: install, upgrade, downgrade, uninstall, reinstall, pack, list, new, delete, prune, rebuild, renew]
         [Default: ./Fudgefile]
         [Alias: -fp]
 
@@ -41,17 +41,17 @@
         This allows you to install packages from local directories, or from custom Chocolatey servers. Passing this will
         also override the source specified in any Fudgefiles
         [Default: Chocolatey's server]
-        [Actions: install, upgrade, reinstall, search, rebuild]
+        [Actions: install, upgrade, downgrade, reinstall, search, rebuild]
         [Alias: -s]
 
     .PARAMETER Dev
         Switch parameter, if supplied will also action upon the devPackages in the Fudgefile
-        [Actions: install, upgrade, uninstall, reinstall, list, delete, prune, rebuild]
+        [Actions: install, upgrade, downgrade, uninstall, reinstall, list, delete, prune, rebuild]
         [Alias: -d]
 
     .PARAMETER DevOnly
         Switch parameter, if supplied will only action upon the devPackages in the Fudgefile
-        [Actions: install, upgrade, uninstall, reinstall, list, delete, prune, rebuild]
+        [Actions: install, upgrade, downgrade, uninstall, reinstall, list, delete, prune, rebuild]
         [Alias: -do]
 
     .PARAMETER Install
@@ -67,7 +67,7 @@
     .PARAMETER Adhoc
         Switch parameter, if supplied will install software from Chocolatey whether or not
         the package is in the Fudgefile
-        [Actions: install, upgrade, uninstall, reinstall]
+        [Actions: install, upgrade, downgrade, uninstall, reinstall]
         [Alias: -ad]
     
     .PARAMETER Version
@@ -171,8 +171,8 @@ if ($Help -or (@('h', 'help') -icontains $Action))
 {
     Write-Host "`nUsage: fudge <action>"
     Write-Host "`nWhere <action> is one of:"
-    Write-Host "    clean, delete, help, install, list, new, pack, prune,"
-    Write-Host "    rebuild, reinstall, renew, search, uninstall, upgrade,"
+    Write-Host "    clean, delete, downgrade, help, install, list, new, pack,"
+    Write-Host "    prune, rebuild, reinstall, renew, search, uninstall, upgrade,"
     Write-Host "    version, which"
     Write-Host ""
     return
@@ -186,7 +186,7 @@ try
 
 
     # ensure we have a valid action
-    $packageActions = @('install', 'upgrade', 'uninstall', 'reinstall', 'list', 'rebuild')
+    $packageActions = @('install', 'upgrade', 'uninstall', 'reinstall', 'list', 'rebuild', 'downgrade')
     $maintainActions = @('prune')
     $packingActions = @('pack')
     $miscActions = @('search', 'clean', 'which')
@@ -337,7 +337,7 @@ try
     # invoke chocolatey based on the action required
     switch ($Action)
     {
-        {($_ -ieq 'install') -or ($_ -ieq 'uninstall') -or ($_ -ieq 'upgrade')}
+        {($_ -ieq 'install') -or ($_ -ieq 'uninstall') -or ($_ -ieq 'upgrade')  -or ($_ -ieq 'downgrade')}
             {
                 Invoke-ChocolateyAction -Action $Action -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly -Adhoc:$Adhoc
             }

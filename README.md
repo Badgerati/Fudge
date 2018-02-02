@@ -37,7 +37,7 @@ Install-Package fudge
 
 * Uses a Fudgefile to control required software
 * Allows you to version control required software to run websites, services and applications
-* Ability to run pre/post install/upgrade/uninstall/pack scripts
+* Ability to run pre/post install/upgrade/downgrade/uninstall/pack scripts
 * Can separate out developer specific software which aren't needed for certain environments
 * You can reinstall all packages, or just in/un/reinstall all packages
 * Allows you to have multiple nuspecs, which you can then pack one or all of with Fudge
@@ -50,10 +50,10 @@ Install-Package fudge
 
 Fudge is a PowerShell tool to help manage software packages via Chocolatey for specific development projects. Think NPM and Bower, but for Chocolatey.
 
-Fudge uses a `Fudgefile` to control what software to install, upgrade or uninstall. You can define specific versions of software or just use the latest version.
+Fudge uses a `Fudgefile` to control what software to install, upgrade, downgrade or uninstall. You can define specific versions of software or just use the latest version.
 Fudge also allows you to separate out specific developer only software - which are only needed for developer/QA environments.
 
-You can also define pre/post install/upgrade/uninstall scripts that need to be run. For example, you could install `redis` and have a `post install` script which sets up REDIS locally.
+You can also define pre/post install/upgrade/downgrade/uninstall scripts that need to be run. For example, you could install `redis` and have a `post install` script which sets up REDIS locally.
 
 Fudge can also run `choco pack` on your nuspec files; allowing you to have multiple nuspecs and then running `fudge pack website` for example, to pack your `website.nuspec`.
 Just running `fudge pack` will pack everything.
@@ -68,12 +68,14 @@ Below is an example of what a `Fudgefile` looks like, with all components shown:
         "pre": {
             "install": "<command or file-path>",
             "upgrade": "<command or file-path>",
+            "downgrade": "<command or file-path>",
             "uninstall": "<command or file-path>",
             "pack": "<command or file-path>"
         },
         "post": {
             "install": "<command or file-path>",
             "upgrade": "<command or file-path>",
+            "downgrade": "<command or file-path>",
             "uninstall": "<command or file-path>",
             "pack": "<command or file-path>"
         }
@@ -110,7 +112,7 @@ And that's it!
 | Name | Description |
 | ---- | ----------- |
 | scripts | The `scripts` section is optional. Scripts can either be direct PowerShell command like `"Write-Host 'hello, world!'"`, or a path to a PowerShell script |
-| packages | These are the main packages that will be installed, upgraded or uninstalled |
+| packages | These are the main packages that will be installed, upgraded, downgraded or uninstalled |
 | devPackages | These packages will only be touched if the `-dev` switch is specified on the CLI |
 | pack | This is a key-value map of paths to nuspecs files that can be packed via Chocolatey |
 
@@ -121,6 +123,7 @@ A normal call to Fudge will look as follows, assuming there's a Fudgefile at the
 ```powershell
 fudge install               # install one or all packages (one if a package_id is passed)
 fudge upgrade               # upgrade one or all packages
+fudge downgrade             # downgrade one or all packages
 fudge uninstall             # uninstall one or all packages
 fudge reinstall             # reinstall one or all packages (runs uninstall then install)
 fudge pack <id>             # pack one or all nuspec files
@@ -135,14 +138,14 @@ fudge which <id>            # returns the path for a command (ie, 7z: C:\...\7z.
 fudge rebuild               # rebuilds the machine by running "clean" then "install"
 ```
 
-* To install developer only packages (also works with upgrade/uninstall/reinstall):
+* To install developer only packages (also works with upgrade/downgrade/uninstall/reinstall):
 
 ```powershell
 fudge install -dev          # this will install from packages and devPackages
 fudge install -devOnly      # this will only install from the devPackages
 ```
 
-* To only install one of the packages in the Fudgefile (also works with upgrade/uninstall/reinstall):
+* To only install one of the packages in the Fudgefile (also works with upgrade/downgrade/uninstall/reinstall):
 
 ```powershell
 fudge install 7zip
