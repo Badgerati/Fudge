@@ -192,13 +192,17 @@ try
     $miscActions = @('search', 'clean', 'which')
     $newActions = @('new')
     $alterActions = @('delete', 'renew')
-    $actions = ($packageActions + $maintainActions + $packingActions + $miscActions + $newActions + $alterActions)
 
+    $actions = ($packageActions + $maintainActions + $packingActions + $miscActions + $newActions + $alterActions)
     if ((Test-Empty $Action) -or $actions -inotcontains $Action)
     {
         Write-Fail "Unrecognised action supplied '$($Action)', should be either: $($actions -join ', ')"
         return
     }
+
+
+    # actions that require chocolatey
+    $isChocoAction = (@('which') -inotcontains $Action)
 
 
     # if adhoc supplied with no key, fail
@@ -217,25 +221,16 @@ try
 
 
     # get the Fudgefile path, if adhoc is supplied set to empty
-    if ($Adhoc)
-    {
-        $FudgefilePath = [string]::Empty
-    }
-    else
-    {
-        $FudgefilePath = Get-FudgefilePath $FudgefilePath
-    }
+    $FudgefilePath = Get-FudgefilePath $FudgefilePath -Adhoc:$Adhoc
 
 
     # ensure that the Fudgefile exists (for certain actions), and deserialise it
     if (($packageActions + $maintainActions + $packingActions + $alterActions) -icontains $Action)
     {
         # if adhoc is supplied, we don't need to get the content
-        if ($Adhoc)
-        {
-            $config = $null
-        }
-        else
+        $config = $null
+
+        if (!$Adhoc)
         {
             if (!(Test-Path $FudgefilePath))
             {
@@ -299,14 +294,17 @@ try
 
 
     # check to see if chocolatey is installed
-    $isChocoInstalled = Test-Chocolatey
+    if ($isChocoAction)
+    {
+        $isChocoInstalled = Test-Chocolatey
+    }
 
 
     # check if the console is elevated (only needs to be done for certain actions)
     $isAdminAction = @('list', 'search', 'new', 'delete', 'renew') -inotcontains $Action
     $actionNeedsAdmin = ($Action -ieq 'delete' -and $Uninstall) -or (@('new', 'renew') -icontains $Action -and $Install)
 
-    if ((!$isChocoInstalled -or $isAdminAction -or $actionNeedsAdmin) -and !(Test-AdminUser))
+    if (((!$isChocoInstalled -and $isChocoAction) -or $isAdminAction -or $actionNeedsAdmin) -and !(Test-AdminUser))
     {
         Write-Notice 'Must be running with administrator priviledges for Fudge to fully function'
         return
@@ -314,10 +312,9 @@ try
 
 
     # if chocolatey isn't installed, install it
-    if (!$isChocoInstalled)
+    if (!$isChocoInstalled -and $isChocoAction)
     {
         Install-Chocolatey
-        $isChocoInstalled = $true
     }
 
 
@@ -328,6 +325,13 @@ try
     }
 
     Write-Host ([string]::Empty)
+
+
+    # retrieve a local list of what's currently installed
+    if ($isChocoAction)
+    {
+        $localList = Get-ChocolateyLocalList
+    }
 
 
     # invoke chocolatey based on the action required
@@ -351,25 +355,21 @@ try
 
         {($_ -ieq 'list')}
             {
-                $localList = Get-ChocolateyLocalList
                 Invoke-FudgeLocalDetails -Config $config -Key $Key -LocalList $localList -Dev:$Dev -DevOnly:$DevOnly
             }
 
         {($_ -ieq 'search')}
             {
-                $localList = Get-ChocolateyLocalList
                 Invoke-Search -Key $Key -Limit $Limit -Source $Source -LocalList $localList
             }
 
         {($_ -ieq 'new')}
             {
-                $localList = Get-ChocolateyLocalList
                 New-Fudgefile -Path $FudgefilePath -Key $Key -LocalList $localList -Install:$Install -Dev:$Dev -DevOnly:$DevOnly
             }
 
         {($_ -ieq 'renew')}
             {
-                $localList = Get-ChocolateyLocalList
                 Restore-Fudgefile -Path $FudgefilePath -Key $Key -LocalList $localList -Install:$Install -Uninstall:$Uninstall -Dev:$Dev -DevOnly:$DevOnly
             }
 
@@ -380,13 +380,11 @@ try
 
         {($_ -ieq 'prune')}
             {
-                $localList = Get-ChocolateyLocalList
                 Invoke-FudgePrune -Config $config -LocalList $localList -Dev:$Dev -DevOnly:$DevOnly
             }
 
         {($_ -ieq 'clean')}
             {
-                $localList = Get-ChocolateyLocalList
                 Invoke-FudgeClean -LocalList $localList
             }
 
@@ -397,7 +395,6 @@ try
 
         {($_ -ieq 'rebuild')}
             {
-                $localList = Get-ChocolateyLocalList
                 Invoke-FudgeClean -LocalList $localList
                 Invoke-ChocolateyAction -Action 'install' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
             }

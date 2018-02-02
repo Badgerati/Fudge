@@ -131,21 +131,22 @@ fudge renew <nuspec|local>  # restores  fudgefile packages to nuspecs/local or e
 fudge delete                # deletes a Fudgefile, with option of uninstalling packages first
 fudge prune                 # uninstalls packages not in a Fudgefile (except choco/fudge)
 fudge clean                 # uninstalls all packages currently installed (except choco/fudge)
+fudge which <id>            # returns the path for a command (ie, 7z: C:\...\7z.exe)
 fudge rebuild               # rebuilds the machine by running "clean" then "install"
 ```
 
 * To install developer only packages (also works with upgrade/uninstall/reinstall):
 
 ```powershell
-fudge install -dev      # this will install from packages and devPackages
-fudge install -devOnly  # this will only install from the devPackages
+fudge install -dev          # this will install from packages and devPackages
+fudge install -devOnly      # this will only install from the devPackages
 ```
 
 * To only install one of the packages in the Fudgefile (also works with upgrade/uninstall/reinstall):
 
 ```powershell
-fudge install 7zip.install
-fudge install 7zip.install -ad  # will adhoc install 7zip without checking Fudgefile
+fudge install 7zip
+fudge install 7zip -ad      # will adhoc install 7zip without checking Fudgefile
 ```
 
 * To pack one or all of your nuspec files:
@@ -200,6 +201,12 @@ fudge prune -d              # pruning now also respects the devPackages
 
 ```powershell
 fudge clean                 # cleans the machine of all packages installed
+```
+
+* To find out where a command is running from on your machine:
+
+```powershell
+fudge which 7z              # returns the path for the 7z command
 ```
 
 * To rebuild a machine:

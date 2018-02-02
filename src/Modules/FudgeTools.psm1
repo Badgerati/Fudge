@@ -297,8 +297,16 @@ function Get-FudgefilePath
 {
     param (
         [string]
-        $Path
+        $Path,
+
+        [switch]
+        $Adhoc
     )
+
+    if ($Adhoc)
+    {
+        return [string]::Empty
+    }
 
     $rootpath = './Fudgefile'
     if (![string]::IsNullOrWhiteSpace($Path))
