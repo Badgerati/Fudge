@@ -64,6 +64,12 @@
         [Actions: delete, renew]
         [Alias: -u]
     
+    .PARAMETER Adhoc
+        Switch parameter, if supplied will install software from Chocolatey whether or not
+        the package is in the Fudgefile
+        [Actions: install, upgrade, uninstall, reinstall]
+        [Alias: -ad]
+    
     .PARAMETER Version
         Switch parameter, if supplied will just display the current version of Fudge installed
         [Alias: -v]
@@ -77,6 +83,9 @@
 
     .EXAMPLE
         fudge install -d    # to also install devPackages (-do will only install devPackages)
+
+    .EXAMPLE
+        fudge install git -ad   # installs git dispite not being in the Fudgefile
     
     .EXAMPLE
         fudge pack website
@@ -130,7 +139,11 @@ param (
 
     [Alias('h')]
     [switch]
-    $Help
+    $Help,
+
+    [Alias('ad')]
+    [switch]
+    $Adhoc
 )
 
 # ensure if there's an error, we stop
@@ -188,6 +201,14 @@ try
     }
 
 
+    # if adhoc supplied with no key, fail
+    if ($Adhoc -and [string]::IsNullOrWhiteSpace($Key))
+    {
+        Write-Fail "No package name supplied for adhoc $($Action)"
+        return
+    }
+
+
     # if -devOnly is passed, set -dev to true
     if ($DevOnly)
     {
@@ -195,20 +216,35 @@ try
     }
 
 
-    # get the Fudgefile path
-    $FudgefilePath = Get-FudgefilePath $FudgefilePath
+    # get the Fudgefile path, if adhoc is supplied set to empty
+    if ($Adhoc)
+    {
+        $FudgefilePath = [string]::Empty
+    }
+    else
+    {
+        $FudgefilePath = Get-FudgefilePath $FudgefilePath
+    }
 
 
     # ensure that the Fudgefile exists (for certain actions), and deserialise it
     if (($packageActions + $maintainActions + $packingActions + $alterActions) -icontains $Action)
     {
-        if (!(Test-Path $FudgefilePath))
+        # if adhoc is supplied, we don't need to get the content
+        if ($Adhoc)
         {
-            Write-Fail "Path to Fudgefile does not exist: $($FudgefilePath)"
-            return
+            $config = $null
         }
+        else
+        {
+            if (!(Test-Path $FudgefilePath))
+            {
+                Write-Fail "Path to Fudgefile does not exist: $($FudgefilePath)"
+                return
+            }
 
-        $config = Get-FudgefileContent $FudgefilePath
+            $config = Get-FudgefileContent $FudgefilePath
+        }
 
         # if we have a custom source in the config and no CLI source, set the source
         if ((Test-Empty $Source) -and $config -ne $null -and !(Test-Empty $config.source))
@@ -229,32 +265,35 @@ try
 
 
     # if there are no packages to install or nuspecs to pack, just return
-    if ($packingActions -icontains $Action)
+    if ($config -ne $null)
     {
-        if (Test-Empty $config.pack)
+        if ($packingActions -icontains $Action)
         {
-            Write-Notice "There are no nuspecs to $($Action)"
-            return
-        }
+            if (Test-Empty $config.pack)
+            {
+                Write-Notice "There are no nuspecs to $($Action)"
+                return
+            }
 
-        if (![string]::IsNullOrWhiteSpace($Key) -and [string]::IsNullOrWhiteSpace($config.pack.$Key))
-        {
-            Write-Notice "Fudgefile does not contain a nuspec pack file for '$($Key)'"
-            return
+            if (![string]::IsNullOrWhiteSpace($Key) -and [string]::IsNullOrWhiteSpace($config.pack.$Key))
+            {
+                Write-Notice "Fudgefile does not contain a nuspec pack file for '$($Key)'"
+                return
+            }
         }
-    }
-    elseif ($packageActions -icontains $Action)
-    {
-        if ((Test-Empty $config.packages) -and (!$Dev -or ($Dev -and (Test-Empty $config.devPackages))))
+        elseif ($packageActions -icontains $Action)
         {
-            Write-Notice "There are no packages to $($Action)"
-            return
-        }
+            if ((Test-Empty $config.packages) -and (!$Dev -or ($Dev -and (Test-Empty $config.devPackages))))
+            {
+                Write-Notice "There are no packages to $($Action)"
+                return
+            }
 
-        if ($DevOnly -and (Test-Empty $config.devPackages))
-        {
-            Write-Notice "There are no devPackages to $($Action)"
-            return
+            if ($DevOnly -and (Test-Empty $config.devPackages))
+            {
+                Write-Notice "There are no devPackages to $($Action)"
+                return
+            }
         }
     }
 
@@ -296,13 +335,13 @@ try
     {
         {($_ -ieq 'install') -or ($_ -ieq 'uninstall') -or ($_ -ieq 'upgrade')}
             {
-                Invoke-ChocolateyAction -Action $Action -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
+                Invoke-ChocolateyAction -Action $Action -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly -Adhoc:$Adhoc
             }
         
         {($_ -ieq 'reinstall')}
             {
-                Invoke-ChocolateyAction -Action 'uninstall' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
-                Invoke-ChocolateyAction -Action 'install' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
+                Invoke-ChocolateyAction -Action 'uninstall' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly -Adhoc:$Adhoc
+                Invoke-ChocolateyAction -Action 'install' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly -Adhoc:$Adhoc
             }
 
         {($_ -ieq 'pack')}
