@@ -972,9 +972,15 @@ function Start-ActionPackages
             $Source = $pkg.source
         }
 
+        $_action = $Action
+        if (!(Test-Empty $pkg.action))
+        {
+            $_action = $pkg.action
+        }
+
         $installed = $true
 
-        Invoke-Chocolatey -Action $Action -Package $pkg.name -Version $pkg.version `
+        Invoke-Chocolatey -Action $_action -Package $pkg.name -Version $pkg.version `
             -Source $Source -Parameters $pkg.params -Arguments $pkg.args -LocalList $LocalList
     }
 
