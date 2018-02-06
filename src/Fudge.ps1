@@ -44,6 +44,20 @@
         [Actions: install, upgrade, downgrade, reinstall, search, rebuild, add]
         [Alias: -s]
 
+    .PARAMETER Parameters
+        This argument allows you to pass parameters to a chocolatey package, as if you were using "--params" on choco.
+        For install/upgrade/downgrade/uninstall/reinstall, this argument only works when "-Adhoc" is also supplied
+        [Default: Empty]
+        [Actions: install, upgrade, downgrade, uninstall, reinstall, add]
+        [Alias: -p]
+
+    .PARAMETER Arguments
+        This argument allows you to pass extra arguments to a chocolatey, such as "--x86" or "--ignore-checksum"
+        For install/upgrade/downgrade/uninstall/reinstall, this argument only works when "-Adhoc" is also supplied
+        [Default: Empty]
+        [Actions: install, upgrade, downgrade, uninstall, reinstall, add]
+        [Alias: -args]
+
     .PARAMETER Dev
         Switch parameter, if supplied will also action upon the devPackages in the Fudgefile
         [Actions: install, upgrade, downgrade, uninstall, reinstall, list, delete, prune, rebuild, add, remove]
@@ -116,6 +130,14 @@ param (
     [Alias('s')]
     [string]
     $Source,
+
+    [Alias('p')]
+    [string]
+    $Parameters,
+
+    [Alias('args')]
+    [string]
+    $Arguments,
 
     [Alias('d')]
     [switch]
@@ -350,13 +372,17 @@ try
     {
         {($_ -ieq 'install') -or ($_ -ieq 'uninstall') -or ($_ -ieq 'upgrade')  -or ($_ -ieq 'downgrade')}
             {
-                Invoke-ChocolateyAction -Action $Action -Key $Key -Source $Source -Config $config -LocalList $localList -Dev:$Dev -DevOnly:$DevOnly -Adhoc:$Adhoc
+                Invoke-ChocolateyAction -Action $Action -Key $Key -Source $Source -Config $config -LocalList $localList `
+                    -Parameters $Parameters -Arguments $Arguments -Dev:$Dev -DevOnly:$DevOnly -Adhoc:$Adhoc
             }
 
         {($_ -ieq 'reinstall')}
             {
-                Invoke-ChocolateyAction -Action 'uninstall' -Key $Key -Source $Source -Config $config -LocalList $localList -Dev:$Dev -DevOnly:$DevOnly -Adhoc:$Adhoc
-                Invoke-ChocolateyAction -Action 'install' -Key $Key -Source $Source -Config $config -LocalList $localList -Dev:$Dev -DevOnly:$DevOnly -Adhoc:$Adhoc
+                Invoke-ChocolateyAction -Action 'uninstall' -Key $Key -Source $Source -Config $config -LocalList $localList `
+                    -Parameters $Parameters -Arguments $Arguments -Dev:$Dev -DevOnly:$DevOnly -Adhoc:$Adhoc
+
+                Invoke-ChocolateyAction -Action 'install' -Key $Key -Source $Source -Config $config -LocalList $localList `
+                    -Parameters $Parameters -Arguments $Arguments -Dev:$Dev -DevOnly:$DevOnly -Adhoc:$Adhoc
             }
 
         {($_ -ieq 'pack')}
@@ -401,12 +427,14 @@ try
 
         {($_ -ieq 'add')}
             {
-                Invoke-FudgeAdd -Path $FudgefilePath -Key $Key -Source $Source -Config $config -LocalList $localList -Dev:$Dev -Install:$Install
+                Invoke-FudgeAdd -Path $FudgefilePath -Key $Key -Source $Source -Config $config -LocalList $localList `
+                    -Parameters $Parameters -Arguments $Arguments -Dev:$Dev -Install:$Install
             }
 
         {($_ -ieq 'remove')}
             {
-                Invoke-FudgeRemove -Path $FudgefilePath -Key $Key -Config $config -LocalList $localList -Dev:$Dev -Uninstall:$Uninstall
+                Invoke-FudgeRemove -Path $FudgefilePath -Key $Key -Config $config -LocalList $localList `
+                    -Parameters $Parameters -Arguments $Arguments -Dev:$Dev -Uninstall:$Uninstall
             }
 
         {($_ -ieq 'which')}

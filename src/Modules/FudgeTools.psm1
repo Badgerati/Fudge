@@ -1051,6 +1051,12 @@ function Invoke-ChocolateyAction
 
         $LocalList,
 
+        [string]
+        $Parameters,
+
+        [string]
+        $Arguments,
+
         [switch]
         $Dev,
 
@@ -1072,7 +1078,7 @@ function Invoke-ChocolateyAction
     {
         $pkg = Get-PackageFromKey -Key $Key
         $vsn = Get-VersionFromKey -Key $Key
-        Invoke-Chocolatey -Action $Action -Package $pkg -Source $Source -Version $vsn -LocalList $LocalList
+        Invoke-Chocolatey -Action $Action -Package $pkg -Source $Source -Version $vsn -LocalList $LocalList -Parameters $Parameters -Arguments $Arguments
     }
     else
     {
@@ -1219,6 +1225,12 @@ function Invoke-FudgeAdd
 
         $LocalList,
 
+        [string]
+        $Parameters,
+
+        [string]
+        $Arguments,
+
         [switch]
         $Dev,
 
@@ -1243,7 +1255,7 @@ function Invoke-FudgeAdd
     # attempt to install if specified
     if ($Install)
     {
-        Invoke-Chocolatey -Action 'install' -Package $KeyName -Source $Source -Version $KeyVer -LocalList $LocalList
+        Invoke-Chocolatey -Action 'install' -Package $KeyName -Source $Source -Version $KeyVer -LocalList $LocalList -Parameters $Parameters -Arguments $Arguments
     }
 
     Write-Information "> Adding $($KeyName)@$($KeyVer) to Fudgefile" -NoNewLine
@@ -1296,6 +1308,12 @@ function Invoke-FudgeRemove
 
         $LocalList,
 
+        [string]
+        $Parameters,
+
+        [string]
+        $Arguments,
+
         [switch]
         $Dev,
 
@@ -1319,7 +1337,7 @@ function Invoke-FudgeRemove
     # attempt to uninstall if specified
     if ($Uninstall)
     {
-        Invoke-Chocolatey -Action 'uninstall' -Package $KeyName -LocalList $LocalList
+        Invoke-Chocolatey -Action 'uninstall' -Package $KeyName -LocalList $LocalList -Parameters $Parameters -Arguments $Arguments
     }
 
     Write-Information "> Removing $($KeyName) from Fudgefile" -NoNewLine
