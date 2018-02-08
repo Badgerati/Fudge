@@ -1,4 +1,4 @@
-{
+﻿{
     "scripts": {
         "pre": {
             "install": "Write-Host 'Pre-Installing'",
