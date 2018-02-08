@@ -7,25 +7,25 @@
         This is done via a Fudgefile which allows you to specify packages (and their versions) to install. You can also
         specify dev-specific packages (like git, or fiddler)
 
-        You are also able to define pre/post install/upgrade/uninstall scripts for additional required functionality
+        You are also able to define pre/post install/upgrade/downgrade/uninstall scripts for additional required functionality
 
         Furthermore, Fudge has a section to allow you to specify multiple nuspec files and pack the one you need
     
     .PARAMETER Action
         The action that Fudge should undertake
-        Actions: install, upgrade, uninstall, reinstall, pack, list, search, new, delete, prune, clean, rebuild,
-                 which, help, renew
+        Actions: install, upgrade, downgrade, uninstall, reinstall, pack, list, search, new, delete, prune, clean, rebuild,
+                 which, help, renew, add, remove
         [Alias: -a]
 
     .PARAMETER Key
         The key represents a package/nuspec name in the Fudgefile
-        [Actions: install, upgrade, uninstall, reinstall, pack, new, which, renew]
+        [Actions: install, upgrade, downgrade, uninstall, reinstall, pack, new, which, renew, add, remove]
         [Alias: -k]
     
     .PARAMETER FudgefilePath
         This will override looking for a default 'Fudgefile' at the root of the current path, and allow you to specify
         other files instead. This allows you to have multiple Fudgefiles
-        [Actions: install, upgrade, uninstall, reinstall, pack, list, new, delete, prune, rebuild, renew]
+        [Actions: install, upgrade, downgrade, uninstall, reinstall, pack, list, new, delete, prune, rebuild, renew, add, remove]
         [Default: ./Fudgefile]
         [Alias: -fp]
 
@@ -41,28 +41,48 @@
         This allows you to install packages from local directories, or from custom Chocolatey servers. Passing this will
         also override the source specified in any Fudgefiles
         [Default: Chocolatey's server]
-        [Actions: install, upgrade, reinstall, search, rebuild]
+        [Actions: install, upgrade, downgrade, reinstall, search, rebuild, add]
         [Alias: -s]
+
+    .PARAMETER Parameters
+        This argument allows you to pass parameters to a chocolatey package, as if you were using "--params" on choco.
+        For install/upgrade/downgrade/uninstall/reinstall, this argument only works when "-Adhoc" is also supplied
+        [Default: Empty]
+        [Actions: install, upgrade, downgrade, uninstall, reinstall, add]
+        [Alias: -p]
+
+    .PARAMETER Arguments
+        This argument allows you to pass extra arguments to a chocolatey, such as "--x86" or "--ignore-checksum"
+        For install/upgrade/downgrade/uninstall/reinstall, this argument only works when "-Adhoc" is also supplied
+        [Default: Empty]
+        [Actions: install, upgrade, downgrade, uninstall, reinstall, add]
+        [Alias: -args]
 
     .PARAMETER Dev
         Switch parameter, if supplied will also action upon the devPackages in the Fudgefile
-        [Actions: install, upgrade, uninstall, reinstall, list, delete, prune, rebuild]
+        [Actions: install, upgrade, downgrade, uninstall, reinstall, list, delete, prune, rebuild, add, remove]
         [Alias: -d]
 
     .PARAMETER DevOnly
         Switch parameter, if supplied will only action upon the devPackages in the Fudgefile
-        [Actions: install, upgrade, uninstall, reinstall, list, delete, prune, rebuild]
+        [Actions: install, upgrade, downgrade, uninstall, reinstall, list, delete, prune, rebuild]
         [Alias: -do]
 
     .PARAMETER Install
         Switch parameter, if supplied will install packages after creating a new Fudgefile
-        [Actions: new, renew]
+        [Actions: new, renew, add]
         [Alias: -i]
     
     .PARAMETER Uninstall
         Switch parameter, if supplied will uninstall packages before deleting a Fudgefile
-        [Actions: delete, renew]
+        [Actions: delete, renew, remove]
         [Alias: -u]
+    
+    .PARAMETER Adhoc
+        Switch parameter, if supplied will install software from Chocolatey whether or not
+        the package is in the Fudgefile
+        [Actions: install, upgrade, downgrade, uninstall, reinstall]
+        [Alias: -ad]
     
     .PARAMETER Version
         Switch parameter, if supplied will just display the current version of Fudge installed
@@ -77,6 +97,9 @@
 
     .EXAMPLE
         fudge install -d    # to also install devPackages (-do will only install devPackages)
+
+    .EXAMPLE
+        fudge install git -ad   # installs git dispite not being in the Fudgefile
     
     .EXAMPLE
         fudge pack website
@@ -108,6 +131,14 @@ param (
     [string]
     $Source,
 
+    [Alias('p')]
+    [string]
+    $Parameters,
+
+    [Alias('args')]
+    [string]
+    $Arguments,
+
     [Alias('d')]
     [switch]
     $Dev,
@@ -130,7 +161,11 @@ param (
 
     [Alias('h')]
     [switch]
-    $Help
+    $Help,
+
+    [Alias('ad')]
+    [switch]
+    $Adhoc
 )
 
 # ensure if there's an error, we stop
@@ -158,9 +193,9 @@ if ($Help -or (@('h', 'help') -icontains $Action))
 {
     Write-Host "`nUsage: fudge <action>"
     Write-Host "`nWhere <action> is one of:"
-    Write-Host "    clean, delete, help, install, list, new, pack, prune,"
-    Write-Host "    rebuild, reinstall, renew, search, uninstall, upgrade,"
-    Write-Host "    version, which"
+    Write-Host "    add, clean, delete, downgrade, help, install, list, new, pack,"
+    Write-Host "    prune, rebuild, reinstall, remove, renew, search, uninstall,"
+    Write-Host "    upgrade, version, which"
     Write-Host ""
     return
 }
@@ -173,17 +208,40 @@ try
 
 
     # ensure we have a valid action
-    $packageActions = @('install', 'upgrade', 'uninstall', 'reinstall', 'list', 'rebuild')
+    $packageActions = @('install', 'upgrade', 'uninstall', 'reinstall', 'list', 'rebuild', 'downgrade', 'add', 'remove')
     $maintainActions = @('prune')
     $packingActions = @('pack')
     $miscActions = @('search', 'clean', 'which')
     $newActions = @('new')
     $alterActions = @('delete', 'renew')
-    $actions = ($packageActions + $maintainActions + $packingActions + $miscActions + $newActions + $alterActions)
 
+    $actions = ($packageActions + $maintainActions + $packingActions + $miscActions + $newActions + $alterActions)
     if ((Test-Empty $Action) -or $actions -inotcontains $Action)
     {
         Write-Fail "Unrecognised action supplied '$($Action)', should be either: $($actions -join ', ')"
+        return
+    }
+
+
+    # actions that require chocolatey
+    $isChocoAction = (@('which', 'add', 'remove', 'delete') -inotcontains $Action)
+    if (!$isChocoAction -and ($Install -or $Uninstall))
+    {
+        $isChocoAction = $true
+    }
+
+
+    # if adhoc was supplied for an invalid action
+    if ($Adhoc -and @('install', 'uninstall', 'upgrade', 'downgrade', 'reinstall') -inotcontains $Action)
+    {
+        Write-Fail "Adhoc supplied for invalid action: $($Action)"
+        return
+    }
+
+    # if adhoc supplied with no key, fail
+    if ($Adhoc -and [string]::IsNullOrWhiteSpace($Key))
+    {
+        Write-Fail "No package name supplied for adhoc $($Action)"
         return
     }
 
@@ -195,20 +253,26 @@ try
     }
 
 
-    # get the Fudgefile path
-    $FudgefilePath = Get-FudgefilePath $FudgefilePath
+    # get the Fudgefile path, if adhoc is supplied set to empty
+    $FudgefilePath = Get-FudgefilePath $FudgefilePath -Adhoc:$Adhoc
 
 
     # ensure that the Fudgefile exists (for certain actions), and deserialise it
     if (($packageActions + $maintainActions + $packingActions + $alterActions) -icontains $Action)
     {
-        if (!(Test-Path $FudgefilePath))
-        {
-            Write-Fail "Path to Fudgefile does not exist: $($FudgefilePath)"
-            return
-        }
+        # if adhoc is supplied, we don't need to get the content
+        $config = $null
 
-        $config = Get-FudgefileContent $FudgefilePath
+        if (!$Adhoc)
+        {
+            if (!(Test-Path $FudgefilePath))
+            {
+                Write-Fail "Path to Fudgefile does not exist: $($FudgefilePath)"
+                return
+            }
+
+            $config = Get-FudgefileContent $FudgefilePath
+        }
 
         # if we have a custom source in the config and no CLI source, set the source
         if ((Test-Empty $Source) -and $config -ne $null -and !(Test-Empty $config.source))
@@ -229,45 +293,51 @@ try
 
 
     # if there are no packages to install or nuspecs to pack, just return
-    if ($packingActions -icontains $Action)
+    if ($config -ne $null)
     {
-        if (Test-Empty $config.pack)
+        if ($packingActions -icontains $Action)
         {
-            Write-Notice "There are no nuspecs to $($Action)"
-            return
-        }
+            if (Test-Empty $config.pack)
+            {
+                Write-Notice "There are no nuspecs to $($Action)"
+                return
+            }
 
-        if (![string]::IsNullOrWhiteSpace($Key) -and [string]::IsNullOrWhiteSpace($config.pack.$Key))
-        {
-            Write-Notice "Fudgefile does not contain a nuspec pack file for '$($Key)'"
-            return
+            if (![string]::IsNullOrWhiteSpace($Key) -and [string]::IsNullOrWhiteSpace($config.pack.$Key))
+            {
+                Write-Notice "Fudgefile does not contain a nuspec pack file for '$($Key)'"
+                return
+            }
         }
-    }
-    elseif ($packageActions -icontains $Action)
-    {
-        if ((Test-Empty $config.packages) -and (!$Dev -or ($Dev -and (Test-Empty $config.devPackages))))
+        elseif ($packageActions -icontains $Action)
         {
-            Write-Notice "There are no packages to $($Action)"
-            return
-        }
+            if ((Test-Empty $config.packages) -and (!$Dev -or ($Dev -and (Test-Empty $config.devPackages))))
+            {
+                Write-Notice "There are no packages to $($Action)"
+                return
+            }
 
-        if ($DevOnly -and (Test-Empty $config.devPackages))
-        {
-            Write-Notice "There are no devPackages to $($Action)"
-            return
+            if ($DevOnly -and (Test-Empty $config.devPackages))
+            {
+                Write-Notice "There are no devPackages to $($Action)"
+                return
+            }
         }
     }
 
 
     # check to see if chocolatey is installed
-    $isChocoInstalled = Test-Chocolatey
+    if ($isChocoAction)
+    {
+        $isChocoInstalled = Test-Chocolatey
+    }
 
 
     # check if the console is elevated (only needs to be done for certain actions)
-    $isAdminAction = @('list', 'search', 'new', 'delete', 'renew') -inotcontains $Action
-    $actionNeedsAdmin = ($Action -ieq 'delete' -and $Uninstall) -or (@('new', 'renew') -icontains $Action -and $Install)
+    $isAdminAction = @('list', 'search', 'new', 'delete', 'renew', 'which', 'add', 'remove') -inotcontains $Action
+    $actionNeedsAdmin = (@('delete', 'remove') -icontains $Action -and $Uninstall) -or (@('new', 'renew', 'add') -icontains $Action -and $Install)
 
-    if ((!$isChocoInstalled -or $isAdminAction -or $actionNeedsAdmin) -and !(Test-AdminUser))
+    if (((!$isChocoInstalled -and $isChocoAction) -or $isAdminAction -or $actionNeedsAdmin) -and !(Test-AdminUser))
     {
         Write-Notice 'Must be running with administrator priviledges for Fudge to fully function'
         return
@@ -275,10 +345,9 @@ try
 
 
     # if chocolatey isn't installed, install it
-    if (!$isChocoInstalled)
+    if (!$isChocoInstalled -and $isChocoAction)
     {
         Install-Chocolatey
-        $isChocoInstalled = $true
     }
 
 
@@ -291,18 +360,29 @@ try
     Write-Host ([string]::Empty)
 
 
+    # retrieve a local list of what's currently installed
+    if ($isChocoAction)
+    {
+        $localList = Get-ChocolateyLocalList
+    }
+
+
     # invoke chocolatey based on the action required
     switch ($Action)
     {
-        {($_ -ieq 'install') -or ($_ -ieq 'uninstall') -or ($_ -ieq 'upgrade')}
+        {($_ -ieq 'install') -or ($_ -ieq 'uninstall') -or ($_ -ieq 'upgrade')  -or ($_ -ieq 'downgrade')}
             {
-                Invoke-ChocolateyAction -Action $Action -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
+                Invoke-ChocolateyAction -Action $Action -Key $Key -Source $Source -Config $config -LocalList $localList `
+                    -Parameters $Parameters -Arguments $Arguments -Dev:$Dev -DevOnly:$DevOnly -Adhoc:$Adhoc
             }
-        
+
         {($_ -ieq 'reinstall')}
             {
-                Invoke-ChocolateyAction -Action 'uninstall' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
-                Invoke-ChocolateyAction -Action 'install' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
+                Invoke-ChocolateyAction -Action 'uninstall' -Key $Key -Source $Source -Config $config -LocalList $localList `
+                    -Parameters $Parameters -Arguments $Arguments -Dev:$Dev -DevOnly:$DevOnly -Adhoc:$Adhoc
+
+                Invoke-ChocolateyAction -Action 'install' -Key $Key -Source $Source -Config $config -LocalList $localList `
+                    -Parameters $Parameters -Arguments $Arguments -Dev:$Dev -DevOnly:$DevOnly -Adhoc:$Adhoc
             }
 
         {($_ -ieq 'pack')}
@@ -312,25 +392,21 @@ try
 
         {($_ -ieq 'list')}
             {
-                $localList = Get-ChocolateyLocalList
                 Invoke-FudgeLocalDetails -Config $config -Key $Key -LocalList $localList -Dev:$Dev -DevOnly:$DevOnly
             }
 
         {($_ -ieq 'search')}
             {
-                $localList = Get-ChocolateyLocalList
                 Invoke-Search -Key $Key -Limit $Limit -Source $Source -LocalList $localList
             }
 
         {($_ -ieq 'new')}
             {
-                $localList = Get-ChocolateyLocalList
                 New-Fudgefile -Path $FudgefilePath -Key $Key -LocalList $localList -Install:$Install -Dev:$Dev -DevOnly:$DevOnly
             }
 
         {($_ -ieq 'renew')}
             {
-                $localList = Get-ChocolateyLocalList
                 Restore-Fudgefile -Path $FudgefilePath -Key $Key -LocalList $localList -Install:$Install -Uninstall:$Uninstall -Dev:$Dev -DevOnly:$DevOnly
             }
 
@@ -341,14 +417,24 @@ try
 
         {($_ -ieq 'prune')}
             {
-                $localList = Get-ChocolateyLocalList
                 Invoke-FudgePrune -Config $config -LocalList $localList -Dev:$Dev -DevOnly:$DevOnly
             }
 
         {($_ -ieq 'clean')}
             {
-                $localList = Get-ChocolateyLocalList
                 Invoke-FudgeClean -LocalList $localList
+            }
+
+        {($_ -ieq 'add')}
+            {
+                Invoke-FudgeAdd -Path $FudgefilePath -Key $Key -Source $Source -Config $config -LocalList $localList `
+                    -Parameters $Parameters -Arguments $Arguments -Dev:$Dev -Install:$Install
+            }
+
+        {($_ -ieq 'remove')}
+            {
+                Invoke-FudgeRemove -Path $FudgefilePath -Key $Key -Config $config -LocalList $localList `
+                    -Parameters $Parameters -Arguments $Arguments -Dev:$Dev -Uninstall:$Uninstall
             }
 
         {($_ -ieq 'which')}
@@ -358,7 +444,6 @@ try
 
         {($_ -ieq 'rebuild')}
             {
-                $localList = Get-ChocolateyLocalList
                 Invoke-FudgeClean -LocalList $localList
                 Invoke-ChocolateyAction -Action 'install' -Key $Key -Source $Source -Config $config -Dev:$Dev -DevOnly:$DevOnly
             }

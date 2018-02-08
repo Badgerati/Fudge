@@ -78,6 +78,120 @@ function Write-Fail
 }
 
 
+# compares two versions, and returns a value specifying if they're equal or different
+# -1: installed version is behind
+#  0: installed version is latest
+#  1: installed version is ahead
+function Compare-Versions
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $Installed,
+
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $NewVersion
+    )
+
+    if (Test-VersionPassedIsLatest $NewVersion)
+    {
+        return -1
+    }
+
+    $i_parts = $Installed -split '\.'
+    $o_parts = $NewVersion -split '\.'
+
+    $count = $i_parts.Length
+    if ($o_parts.Length -gt $count)
+    {
+        $count = $o_parts.Length
+    }
+
+    for ($i = 0; $i -lt $count; $i++)
+    {
+        if ($i_parts[$i] -eq $o_parts[$i])
+        {
+            continue
+        }
+        
+        if ($i_parts[$i] -lt $o_parts[$i])
+        {
+            return -1
+        }
+        else
+        {
+            return 1
+        }
+    }
+
+    return 0
+}
+
+
+# takes a package about to be installed, and checks if the version needs to be installed,
+# or just a downgrade/upgrade of what's already installed
+function Get-InstallAction
+{
+    param (
+        [string]
+        $Package,
+
+        [string]
+        $Version,
+
+        $LocalList
+    )
+
+    $current = $LocalList[$Package]
+    if (Test-Empty $current)
+    {
+        return 'install'
+    }
+
+    $action = Compare-Versions -Installed $current -NewVersion $Version
+
+    switch ($action)
+    {
+        1 { return 'downgrade' }
+        -1 { return 'upgrade' }
+        default { return 'install' }
+    }
+}
+
+
+# return the package name from a supplied key
+function Get-PackageFromKey
+{
+    param (
+        [string]
+        $Key
+    )
+
+    return ($Key -isplit '@')[0].Trim()
+}
+
+
+# return the version from a supplied key
+function Get-VersionFromKey
+{
+    param (
+        [string]
+        $Key
+    )
+
+    $parts = ($Key -isplit '@')
+    if ($parts.Length -le 1)
+    {
+        return 'latest'
+    }
+
+    return $parts[1].Trim()
+}
+
+
 # returns the levenshtein distance between two strings
 function Get-Levenshtein
 {
@@ -159,7 +273,7 @@ function Test-VersionPassedIsLatest
         $Version
     )
 
-    return ((Test-Empty $Version) -or $Version -ieq 'latest')
+    return ((Test-Empty $Version) -or $Version.Trim() -ieq 'latest')
 }
 
 
@@ -297,8 +411,16 @@ function Get-FudgefilePath
 {
     param (
         [string]
-        $Path
+        $Path,
+
+        [switch]
+        $Adhoc
     )
+
+    if ($Adhoc)
+    {
+        return [string]::Empty
+    }
 
     $rootpath = './Fudgefile'
     if (![string]::IsNullOrWhiteSpace($Path))
@@ -351,6 +473,8 @@ function Remove-Fudgefile
         [string]
         $Path,
 
+        $LocalList,
+
         [switch]
         $Uninstall,
 
@@ -372,7 +496,7 @@ function Remove-Fudgefile
     if ($Uninstall)
     {
         $config = Get-FudgefileContent $Path
-        Invoke-ChocolateyAction -Action 'uninstall' -Key $null -Config $config -Dev:$Dev -DevOnly:$DevOnly
+        Invoke-ChocolateyAction -Action 'uninstall' -Key $null -Config $config -LocalList $LocalList -Dev:$Dev -DevOnly:$DevOnly
     }
 
     # remove the fudgefile
@@ -394,7 +518,7 @@ function Restore-Fudgefile
 
         [string]
         $Key,
-        
+
         $LocalList,
 
         [switch]
@@ -453,7 +577,7 @@ function Restore-Fudgefile
     # first, uninstall the packages, if requested
     if ($Uninstall)
     {
-        Invoke-ChocolateyAction -Action 'uninstall' -Key $null -Config $content -Dev:$Dev -DevOnly:$DevOnly
+        Invoke-ChocolateyAction -Action 'uninstall' -Key $null -Config $content -LocalList $LocalList -Dev:$Dev -DevOnly:$DevOnly
     }
 
     # remove all current packages
@@ -490,7 +614,7 @@ function Restore-Fudgefile
     # now install the packages
     if ($Install)
     {
-        Invoke-ChocolateyAction -Action 'upgrade' -Key $null -Config $content -Dev:$Dev -DevOnly:$DevOnly
+        Invoke-ChocolateyAction -Action 'install' -Key $null -Config $content -LocalList $LocalList -Dev:$Dev -DevOnly:$DevOnly
     }
 }
 
@@ -552,8 +676,8 @@ function New-Fudgefile
     # setup the empty fudgefile
     $content = @{
         'scripts' = @{
-            'pre' = @{ 'install'= ''; 'uninstall'= ''; 'upgrade'= ''; 'pack'= ''; };
-            'post' = @{ 'install'= ''; 'uninstall'= ''; 'upgrade'= ''; 'pack'= ''; };
+            'pre' = @{ 'install'= ''; 'uninstall'= ''; 'upgrade'= ''; 'downgrade' = ''; 'pack'= ''; };
+            'post' = @{ 'install'= ''; 'uninstall'= ''; 'upgrade'= ''; 'downgrade' = ''; 'pack'= ''; };
         };
         'packages' = @();
         'devPackages' = @();
@@ -583,7 +707,7 @@ function New-Fudgefile
     if ($Install)
     {
         $config = Get-FudgefileContent $Path
-        Invoke-ChocolateyAction -Action 'upgrade' -Key $null -Config $config -Dev:$Dev -DevOnly:$DevOnly
+        Invoke-ChocolateyAction -Action 'install' -Key $null -Config $config -LocalList $LocalList -Dev:$Dev -DevOnly:$DevOnly
     }
 }
 
@@ -820,10 +944,12 @@ function Start-ActionPackages
         $Source,
 
         [array]
-        $Packages
+        $Packages,
+
+        $LocalList
     )
 
-    # if there are no packages to deal with, return
+    # if there are no packages to deal with and adhoc not supplied, return
     if (Test-Empty $Packages)
     {
         return
@@ -846,10 +972,16 @@ function Start-ActionPackages
             $Source = $pkg.source
         }
 
+        $_action = $Action
+        if (!(Test-Empty $pkg.action))
+        {
+            $_action = $pkg.action
+        }
+
         $installed = $true
 
-        Invoke-Chocolatey -Action $Action -Package $pkg.name -Version $pkg.version `
-            -Source $Source -Parameters $pkg.params -Arguments $pkg.args
+        Invoke-Chocolatey -Action $_action -Package $pkg.name -Version $pkg.version `
+            -Source $Source -Parameters $pkg.params -Arguments $pkg.args -LocalList $LocalList
     }
 
     # if we didn't install anything, and we have a key - say it isn't present in file
@@ -923,42 +1055,63 @@ function Invoke-ChocolateyAction
 
         $Config,
 
+        $LocalList,
+
+        [string]
+        $Parameters,
+
+        [string]
+        $Arguments,
+
         [switch]
         $Dev,
 
         [switch]
-        $DevOnly
+        $DevOnly,
+
+        [switch]
+        $Adhoc
     )
 
-    # ensure the config object exists
-    if ($Config -eq $null)
+    # ensure the config object exists, unless adhoc is supplied
+    if (!$Adhoc -and $Config -eq $null)
     {
         throw "Invalid Fudge configuration supplied"
     }
 
-    # invoke pre-script for current action
-    Invoke-Script -Action $Action -Stage 'pre' -Scripts $Config.scripts
-
-    # invoke chocolatey based on the action
-    if ($Action -ieq 'pack')
+    # if we're adhoc, just call chocolatey directly
+    if ($Adhoc)
     {
-        Start-ActionPack -Action $Action -Key $Key -Nuspecs $Config.pack
+        $pkg = Get-PackageFromKey -Key $Key
+        $vsn = Get-VersionFromKey -Key $Key
+        Invoke-Chocolatey -Action $Action -Package $pkg -Source $Source -Version $vsn -LocalList $LocalList -Parameters $Parameters -Arguments $Arguments
     }
     else
     {
-        if (!$DevOnly)
+        # invoke pre-script for current action, unless adhoc
+        Invoke-Script -Action $Action -Stage 'pre' -Scripts $Config.scripts
+
+        # invoke chocolatey based on the action
+        if ($Action -ieq 'pack')
         {
-            Start-ActionPackages -Action $Action -Key $Key -Packages $Config.packages -Source $Source
+            Start-ActionPack -Action $Action -Key $Key -Nuspecs $Config.pack
+        }
+        else
+        {
+            if (!$DevOnly)
+            {
+                Start-ActionPackages -Action $Action -Key $Key -Packages $Config.packages -Source $Source -LocalList $LocalList
+            }
+
+            if ($Dev)
+            {
+                Start-ActionPackages -Action $Action -Key $Key -Packages $Config.devPackages -Source $Source -LocalList $LocalList
+            }
         }
 
-        if ($Dev)
-        {
-            Start-ActionPackages -Action $Action -Key $Key -Packages $Config.devPackages -Source $Source
-        }
+        # invoke post-script for current action
+        Invoke-Script -Action $Action -Stage 'post' -Scripts $Config.scripts
     }
-    
-    # invoke post-script for current action
-    Invoke-Script -Action $Action -Stage 'post' -Scripts $Config.scripts
 }
 
 
@@ -1057,6 +1210,161 @@ function Invoke-FudgeClean
 }
 
 
+# add a package to a fudgefile
+function Invoke-FudgeAdd
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $Path,
+
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $Key,
+
+        [string]
+        $Source,
+
+        $Config,
+
+        $LocalList,
+
+        [string]
+        $Parameters,
+
+        [string]
+        $Arguments,
+
+        [switch]
+        $Dev,
+
+        [switch]
+        $Install
+    )
+
+    # get name and version from key
+    $KeyName = Get-PackageFromKey -Key $Key
+    $KeyVer = Get-VersionFromKey -Key $Key
+
+    # ensure package isn't already present
+    $pkg_count = ($config.packages | Where-Object { $_.name -ieq $KeyName } | Measure-Object).Count
+    $dev_count = ($config.devPackages | Where-Object { $_.name -ieq $KeyName } | Measure-Object).Count
+
+    if ($pkg_count -ne 0 -or $dev_count -ne 0)
+    {
+        Write-Notice "The package '$($KeyName)' already exists in the Fudgefile"
+        return
+    }
+
+    # attempt to install if specified
+    if ($Install)
+    {
+        Invoke-Chocolatey -Action 'install' -Package $KeyName -Source $Source -Version $KeyVer -LocalList $LocalList -Parameters $Parameters -Arguments $Arguments
+    }
+
+    Write-Information "> Adding $($KeyName)@$($KeyVer) to Fudgefile" -NoNewLine
+
+    # create package json object
+    $obj = @{ 'name' = $KeyName; }
+
+    if (!(Test-Empty $KeyVer))
+    {
+        $obj['version'] = $KeyVer
+    }
+
+    if (!(Test-Empty $Source) -and ($Source -ine $Config.source))
+    {
+        $obj['source'] = $Source
+    }
+
+    # add to config
+    if ($Dev)
+    {
+        [array]$Config.devPackages += $obj
+    }
+    else
+    {
+        [array]$Config.packages += $obj
+    }
+
+    # save new config back
+    $Config | ConvertTo-Json | Out-File -FilePath $Path -Encoding utf8 -Force
+    Write-Success " > added"
+    Write-Details "   > $($Path)"
+}
+
+
+# removes a package from a fudgefile
+function Invoke-FudgeRemove
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $Path,
+
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $Key,
+
+        $Config,
+
+        $LocalList,
+
+        [string]
+        $Parameters,
+
+        [string]
+        $Arguments,
+
+        [switch]
+        $Dev,
+
+        [switch]
+        $Uninstall
+    )
+
+    # get name and version from key
+    $KeyName = Get-PackageFromKey -Key $Key
+
+    # ensure package isn't already removed
+    $pkg_count = ($config.packages | Where-Object { $_.name -ieq $KeyName } | Measure-Object).Count
+    $dev_count = ($config.devPackages | Where-Object { $_.name -ieq $KeyName } | Measure-Object).Count
+
+    if ($pkg_count -eq 0 -and $dev_count -eq 0)
+    {
+        Write-Notice "The package '$($KeyName)' is not present in the Fudgefile"
+        return
+    }
+
+    # attempt to uninstall if specified
+    if ($Uninstall)
+    {
+        Invoke-Chocolatey -Action 'uninstall' -Package $KeyName -LocalList $LocalList -Parameters $Parameters -Arguments $Arguments
+    }
+
+    Write-Information "> Removing $($KeyName) from Fudgefile" -NoNewLine
+
+    # remove to config
+    if ($Dev)
+    {
+        $Config.devPackages = ($Config.devPackages | Where-Object { $_.name -ine $KeyName })
+    }
+    else
+    {
+        $Config.packages = ($Config.packages | Where-Object { $_.name -ine $KeyName })
+    }
+
+    # save new config back
+    $Config | ConvertTo-Json | Out-File -FilePath $Path -Encoding utf8 -Force
+    Write-Success " > removed"
+    Write-Details "   > $($Path)"
+}
+
+
 # returns the path for where a command is located
 function Invoke-FudgeWhich
 {
@@ -1114,7 +1422,7 @@ function Format-ChocolateyParams
         return [string]::Empty
     }
 
-    return "-params '$($Parameters)'"
+    return "--params='$($Parameters)'"
 }
 
 
@@ -1417,7 +1725,9 @@ function Invoke-Chocolatey
         $Parameters,
 
         [string]
-        $Arguments
+        $Arguments,
+
+        $LocalList
     )
 
     # if there was no package passed, return
@@ -1426,7 +1736,7 @@ function Invoke-Chocolatey
         return
     }
 
-    # set the source from which to install/upgrade packages
+    # set the source from which to install/upgrade/downgrade packages
     $SourceArg = Format-ChocolateySource $Source
 
     # set the parameters to pass
@@ -1436,25 +1746,37 @@ function Invoke-Chocolatey
     $VersionArg = Format-ChocolateyVersion $Version
     $Version = Format-SafeguardString $Version 'latest'
 
+    # if action is 'install', do we need to install, or upgrade/downgrade based on version?
+    if ($Action -ieq 'install' -and $LocalList -ne $null)
+    {
+        $Action = Get-InstallAction -Package $Package -Version $Version -LocalList $LocalList
+    }
+
     # run chocolatey for appropriate action
     switch ($Action.ToLowerInvariant())
     {
         'install'
             {
                 Write-Information "> Installing $($Package) ($($Version))" -NoNewLine
-                $output = choco install $Package $VersionArg -y $SourceArg $ParametersArg $Arguments
+                $output = Invoke-Expression "choco install $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments)"
             }
 
         'upgrade'
             {
                 Write-Information "> Upgrading $($Package) to ($($Version))" -NoNewLine
-                $output = choco upgrade $Package $VersionArg -y $SourceArg $ParametersArg $Arguments
+                $output = Invoke-Expression "choco upgrade $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments)"
+            }
+
+        'downgrade'
+            {
+                Write-Information "> Downgrading $($Package) to ($($Version))" -NoNewLine
+                $output = Invoke-Expression "choco upgrade $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments) --allow-downgrade"
             }
 
         'uninstall'
             {
                 Write-Information "> Uninstalling $($Package)" -NoNewLine
-                $output = choco uninstall $Package -y -x $ParametersArg $Arguments
+                $output = Invoke-Expression "choco uninstall $($Package) -y -x $($ParametersArg) $($Arguments)"
             }
 
         'pack'
@@ -1466,7 +1788,7 @@ function Invoke-Chocolatey
                 try
                 {
                     Push-Location $path
-                    $output = choco pack $name $Arguments
+                    $output = Invoke-Expression "choco pack $($name) $($Arguments)"
                 }
                 finally
                 {
@@ -1475,7 +1797,8 @@ function Invoke-Chocolatey
             }
     }
 
-    if (!$? -or $LASTEXITCODE -ne 0)
+    $lastcode = $LASTEXITCODE
+    if (!$? -or ($lastcode -ne 0 -and $lastcode -ne 3010))
     {
         $fail = $true
 
@@ -1487,7 +1810,7 @@ function Invoke-Chocolatey
                     $fail = !($output -ilike '*has been successfully uninstalled*' -or $output -ilike '*Cannot uninstall a non-existent package*')
                 }
 
-            {($_ -ieq 'install')}
+            {($_ -ieq 'install') -or ($_ -ieq 'upgrade') -or ($_ -ieq 'downgrade')}
                 {
                     $fail = !($output -ilike '*has been successfully installed*' -or $output -ilike '*has been installed*')
                 }
@@ -1503,7 +1826,7 @@ function Invoke-Chocolatey
 
     $actionVerb = ("$($Action)ed" -ireplace 'eed$', 'ed')
 
-    if ($output -ilike '*exit code 3010*')
+    if ($output -ilike '*exit code 3010*' -or $lastcode -eq 3010)
     {
         Write-Success " > $($actionVerb)" -NoNewLine
         Write-Notice " > Reboot Required"
