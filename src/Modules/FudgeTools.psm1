@@ -449,15 +449,15 @@ function Get-FudgefileContent
         $Path
     )
 
-    if (!(Test-Path $Path))
-    {
+    if (!(Test-Path $Path)) {
         throw "Path to Fudgefile does not exist: $($Path)"
     }
 
-    $config = Get-Content -Path $Path -Raw | ConvertFrom-Json
-    if (!$?)
-    {
-        throw "Failed to parse the Fudgefile at: $($Path)"
+    try {
+        $config = Get-Content -Path $Path -Raw | ConvertFrom-Json
+    }
+    catch {
+        throw "Failed to parse the Fudgefile at: $($Path)`n$($_.Exception)"
     }
 
     return $config
