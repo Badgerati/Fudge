@@ -946,6 +946,9 @@ function Start-ActionPackages
         [array]
         $Packages,
 
+        [string]
+        $Arguments,
+
         $LocalList
     )
 
@@ -981,7 +984,7 @@ function Start-ActionPackages
         $installed = $true
 
         Invoke-Chocolatey -Action $_action -Package $pkg.name -Version $pkg.version `
-            -Source $Source -Parameters $pkg.params -Arguments $pkg.args -LocalList $LocalList
+            -Source $Source -Parameters $pkg.params -Arguments "$($pkg.args) $($Arguments)".Trim() -LocalList $LocalList
     }
 
     # if we didn't install anything, and we have a key - say it isn't present in file
@@ -1100,12 +1103,12 @@ function Invoke-ChocolateyAction
         {
             if (!$DevOnly)
             {
-                Start-ActionPackages -Action $Action -Key $Key -Packages $Config.packages -Source $Source -LocalList $LocalList
+                Start-ActionPackages -Action $Action -Key $Key -Packages $Config.packages -Source $Source -LocalList $LocalList -Arguments $Arguments
             }
 
             if ($Dev)
             {
-                Start-ActionPackages -Action $Action -Key $Key -Packages $Config.devPackages -Source $Source -LocalList $LocalList
+                Start-ActionPackages -Action $Action -Key $Key -Packages $Config.devPackages -Source $Source -LocalList $LocalList -Arguments $Arguments
             }
         }
 
