@@ -1756,12 +1756,20 @@ function Invoke-Chocolatey
 
     # if the version is latest, attempt to get the real current version
     if (Test-VersionPassedIsLatest -Version $Version) {
+        $latest = $true
         $Version = Get-ChocolateyLatestVersion -Package $Package -Source $Source
     }
 
-    # set the version to pass
-    $VersionArg = Format-ChocolateyVersion $Version
     $Version = Format-SafeguardString $Version 'latest'
+
+    # build a version string, so if latest we can show the latest version
+    $VersionStr = "$($Version)"
+    if ($latest) {
+        $VersionStr = "latest [$($Version)]"
+    }
+
+    # set the version arg to pass
+    $VersionArg = Format-ChocolateyVersion $Version
 
     # if action is 'install', do we need to install, or upgrade/downgrade based on version?
     if (($Action -ieq 'install') -and ($null -ne $LocalList)) {
@@ -1773,19 +1781,19 @@ function Invoke-Chocolatey
     {
         'install'
             {
-                Write-Information "> Installing $($Package) ($($Version))" -NoNewLine
+                Write-Information "> Installing $($Package) ($($VersionStr))" -NoNewLine
                 $output = Invoke-Expression "choco install $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments)"
             }
 
         'upgrade'
             {
-                Write-Information "> Upgrading $($Package) to ($($Version))" -NoNewLine
+                Write-Information "> Upgrading $($Package) to ($($VersionStr))" -NoNewLine
                 $output = Invoke-Expression "choco upgrade $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments)"
             }
 
         'downgrade'
             {
-                Write-Information "> Downgrading $($Package) to ($($Version))" -NoNewLine
+                Write-Information "> Downgrading $($Package) to ($($VersionStr))" -NoNewLine
                 $output = Invoke-Expression "choco upgrade $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments) --allow-downgrade"
             }
 
