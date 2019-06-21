@@ -96,8 +96,7 @@ function Compare-Versions
         $NewVersion
     )
 
-    if (Test-VersionPassedIsLatest $NewVersion)
-    {
+    if (Test-VersionPassedIsLatest $NewVersion) {
         return -1
     }
 
@@ -105,24 +104,20 @@ function Compare-Versions
     $o_parts = $NewVersion -split '\.'
 
     $count = $i_parts.Length
-    if ($o_parts.Length -gt $count)
-    {
+    if ($o_parts.Length -gt $count) {
         $count = $o_parts.Length
     }
 
     for ($i = 0; $i -lt $count; $i++)
     {
-        if ($i_parts[$i] -eq $o_parts[$i])
-        {
+        if ($i_parts[$i] -eq $o_parts[$i]) {
             continue
         }
         
-        if ($i_parts[$i] -lt $o_parts[$i])
-        {
+        if ($i_parts[$i] -lt $o_parts[$i]) {
             return -1
         }
-        else
-        {
+        else {
             return 1
         }
     }
@@ -145,12 +140,13 @@ function Get-InstallAction
         $LocalList
     )
 
+    # if it's not installed, it needs installing
     $current = $LocalList[$Package]
-    if (Test-Empty $current)
-    {
+    if (Test-Empty $current) {
         return 'install'
     }
 
+    # compare the version, and determine if we need to upgrade/downgrade
     $action = Compare-Versions -Installed $current -NewVersion $Version
 
     switch ($action)
@@ -183,8 +179,7 @@ function Get-VersionFromKey
     )
 
     $parts = ($Key -isplit '@')
-    if ($parts.Length -le 1)
-    {
+    if ($parts.Length -le 1) {
         return 'latest'
     }
 
@@ -250,14 +245,12 @@ function Format-SafeguardString
         $Default = $null
     )
 
-    if (!(Test-Empty $Value))
-    {
+    if (!(Test-Empty $Value)) {
         return $Value
     }
 
     $Value = [string]::Empty
-    if (!(Test-Empty $Default))
-    {
+    if (!(Test-Empty $Default)) {
         $Value = $Default
     }
 
@@ -273,7 +266,7 @@ function Test-VersionPassedIsLatest
         $Version
     )
 
-    return ((Test-Empty $Version) -or $Version.Trim() -ieq 'latest')
+    return ((Test-Empty $Version) -or ($Version.Trim() -ieq 'latest'))
 }
 
 
@@ -449,15 +442,15 @@ function Get-FudgefileContent
         $Path
     )
 
-    if (!(Test-Path $Path))
-    {
+    if (!(Test-Path $Path)) {
         throw "Path to Fudgefile does not exist: $($Path)"
     }
 
-    $config = Get-Content -Path $Path -Raw | ConvertFrom-Json
-    if (!$?)
-    {
-        throw "Failed to parse the Fudgefile at: $($Path)"
+    try {
+        $config = Get-Content -Path $Path -Raw | ConvertFrom-Json
+    }
+    catch {
+        throw "Failed to parse the Fudgefile at: $($Path)`n$($_.Exception)"
     }
 
     return $config
@@ -860,14 +853,12 @@ function Test-Empty
 # check to see if chocolatey is installed on the current machine
 function Test-Chocolatey
 {
-    try
-    {
+    try {
         $output = Invoke-Expression -Command 'choco -v'
         Write-Details "Chocolatey v$($output)"
         return $true
     }
-    catch
-    {
+    catch {
         return $false
     }
 }
@@ -879,13 +870,11 @@ function Install-Chocolatey
     Write-Notice "Installing Chocolatey"
 
     $policies = @('Unrestricted', 'ByPass', 'AllSigned')
-    if ($policies -inotcontains (Get-ExecutionPolicy))
-    {
+    if ($policies -inotcontains (Get-ExecutionPolicy)) {
         Set-ExecutionPolicy Bypass -Force
     }
 
     Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')) | Out-Null
-
     Write-Success "Chocolatey installed`n"
 }
 
@@ -905,21 +894,18 @@ function Invoke-Script
         $Scripts
     )
 
-    # if there is no  stage, return
-    if (Test-Empty $Stage)
-    {
+    # if there is no stage, return
+    if (Test-Empty $Stage) {
         return
     }
 
     # if there are no scripts, return
-    if ((Test-Empty $Scripts) -or (Test-Empty $Scripts.$Stage))
-    {
+    if ((Test-Empty $Scripts) -or (Test-Empty $Scripts.$Stage)) {
         return
     }
 
     $script = $Scripts.$Stage.$Action
-    if (Test-Empty $script)
-    {
+    if (Test-Empty $script) {
         return
     }
 
@@ -952,9 +938,8 @@ function Start-ActionPackages
         $LocalList
     )
 
-    # if there are no packages to deal with and adhoc not supplied, return
-    if (Test-Empty $Packages)
-    {
+    # if there are no packages to deal with, return
+    if (Test-Empty $Packages) {
         return
     }
 
@@ -965,19 +950,19 @@ function Start-ActionPackages
     # loop through each of the packages, and call chocolatey on them
     foreach ($pkg in $Packages)
     {
-        if ($haveKey -and ($pkg.name -ine $Key))
-        {
+        # skip if we forcing action on a specific package
+        if ($haveKey -and ($pkg.name -ine $Key)) {
             continue
         }
 
-        if (![string]::IsNullOrWhiteSpace($pkg.source))
-        {
+        # use a package specific custom source
+        if (![string]::IsNullOrWhiteSpace($pkg.source)) {
             $Source = $pkg.source
         }
 
+        # force a specific action on the package
         $_action = $Action
-        if (!(Test-Empty $pkg.action))
-        {
+        if (!(Test-Empty $pkg.action)) {
             $_action = $pkg.action
         }
 
@@ -988,8 +973,7 @@ function Start-ActionPackages
     }
 
     # if we didn't install anything, and we have a key - say it isn't present in file
-    if (!$installed -and $haveKey)
-    {
+    if (!$installed -and $haveKey) {
         Write-Notice "Package not found in Fudgefile: $($Key)"
     }
 }
@@ -1011,8 +995,7 @@ function Start-ActionPack
     )
 
     # if there are no nuspecs to deal with, return
-    if (Test-Empty $Nuspecs)
-    {
+    if (Test-Empty $Nuspecs) {
         return
     }
 
@@ -1023,19 +1006,16 @@ function Start-ActionPack
     # loop through each of the nuspecs, and call chocolatey on them for packing
     foreach ($pkg in $Nuspecs.psobject.properties.name)
     {
-        if ($haveKey -and ($pkg -ine $Key))
-        {
+        if ($haveKey -and ($pkg -ine $Key)) {
             continue
         }
 
         $packed = $true
-
         Invoke-Chocolatey -Action $Action -Package $pkg -Version ($Nuspecs.$pkg)
     }
 
     # if we didn't pavk anything, and we have a key - say it isn't present in file
-    if (!$packed -and $haveKey)
-    {
+    if (!$packed -and $haveKey) {
         Write-Notice "Nuspec not found in Fudgefile: $($Key)"
     }
 }
@@ -1077,12 +1057,11 @@ function Invoke-ChocolateyAction
     )
 
     # ensure the config object exists, unless adhoc is supplied
-    if (!$Adhoc -and $Config -eq $null)
-    {
+    if (!$Adhoc -and $null -eq $Config) {
         throw "Invalid Fudge configuration supplied"
     }
 
-    # if we're adhoc, just call chocolatey directly
+    # if we're running as adhoc, just call chocolatey directly
     if ($Adhoc)
     {
         $pkg = Get-PackageFromKey -Key $Key
@@ -1091,24 +1070,26 @@ function Invoke-ChocolateyAction
     }
     else
     {
-        # invoke pre-script for current action, unless adhoc
+        # invoke pre-script for current action
         Invoke-Script -Action $Action -Stage 'pre' -Scripts $Config.scripts
 
         # invoke chocolatey based on the action
-        if ($Action -ieq 'pack')
-        {
-            Start-ActionPack -Action $Action -Key $Key -Nuspecs $Config.pack
-        }
-        else
-        {
-            if (!$DevOnly)
-            {
-                Start-ActionPackages -Action $Action -Key $Key -Packages $Config.packages -Source $Source -LocalList $LocalList -Arguments $Arguments
+        switch ($Action.ToLowerInvariant()) {
+            'pack' {
+                # run pack on supplied nuspecs
+                Start-ActionPack -Action $Action -Key $Key -Nuspecs $Config.pack
             }
 
-            if ($Dev)
-            {
-                Start-ActionPackages -Action $Action -Key $Key -Packages $Config.devPackages -Source $Source -LocalList $LocalList -Arguments $Arguments
+            default {
+                # install normal packages, unless flagged as dev only
+                if (!$DevOnly) {
+                    Start-ActionPackages -Action $Action -Key $Key -Packages $Config.packages -Source $Source -LocalList $LocalList -Arguments $Arguments
+                }
+
+                # install dev packages
+                if ($Dev) {
+                    Start-ActionPackages -Action $Action -Key $Key -Packages $Config.devPackages -Source $Source -LocalList $LocalList -Arguments $Arguments
+                }
             }
         }
 
@@ -1403,8 +1384,7 @@ function Format-ChocolateySource
         $Source
     )
 
-    if (Test-Empty $Source)
-    {
+    if (Test-Empty $Source) {
         return [string]::Empty
     }
 
@@ -1420,8 +1400,7 @@ function Format-ChocolateyParams
         $Parameters
     )
 
-    if (Test-Empty $Parameters)
-    {
+    if (Test-Empty $Parameters) {
         return [string]::Empty
     }
 
@@ -1437,11 +1416,12 @@ function Format-ChocolateyVersion
         $Version
     )
 
-    if (Test-VersionPassedIsLatest $Version)
-    {
+    # if the version is latest, return empty
+    if (Test-VersionPassedIsLatest -Version $Version) {
         return [string]::Empty
     }
 
+    # return the specific version to install
     return "--version $($Version)"
 }
 
@@ -1461,8 +1441,7 @@ function Get-ChocolateySearchList
     $Source = Format-ChocolateySource $Source
 
     $list = (choco search $Key $Source)
-    if (!$?)
-    {
+    if (!$?) {
         Write-Fail "$($list)"
         throw 'Failed to retrieve search results from Chocolatey'
     }
@@ -1475,8 +1454,7 @@ function Get-ChocolateySearchList
 function Get-ChocolateyLocalList
 {
     $list = (choco list -lo)
-    if (!$?)
-    {
+    if (!$?) {
         Write-Fail "$($list)"
         throw 'Failed to retrieve local list of installed packages'
     }
@@ -1506,6 +1484,93 @@ function Format-ChocolateyList
     return $map
 }
 
+# get chocolatey search results, filtered by fudge
+function Format-ChocolateySearchResults
+{
+    param (
+        [Parameter()]
+        [string]
+        $Key,
+
+        [Parameter()]
+        [int]
+        $Limit,
+
+        [Parameter()]
+        [string]
+        $Source
+    )
+
+    # get search results from chocolatey
+    $results = Get-ChocolateySearchList -Key $Key -Source $Source
+    $OrganisedResults = @()
+    $count = 0
+
+    # if limit is 0, set to total results returned
+    if ($Limit -eq 0) {
+        $Limit = ($results | Measure-Object).Count
+    }
+
+    # perfect match result
+    if ($results.ContainsKey($Key)) {
+        $count++
+        $OrganisedResults += @{ 'Name' = $Key; 'Version' = $results[$Key]; }
+        $results.Remove($Key)
+    }
+
+    # starts with for sub-packages
+    if ($count -lt $Limit)
+    {
+        $results.Clone().Keys | ForEach-Object {
+            if ($_.StartsWith("$($Key).")) {
+                $count++
+                $OrganisedResults += @{ 'Name' = $_; 'Version' = $results[$_]; }
+                $results.Remove($_)
+            }
+        }
+    }
+
+    # starts with for other packages
+    if ($count -lt $Limit)
+    {
+        $results.Clone().Keys | ForEach-Object {
+            if ($_.StartsWith($Key)) {
+                $count++
+                $OrganisedResults += @{ 'Name' = $_; 'Version' = $results[$_]; }
+                $results.Remove($_)
+            }
+        }
+    }
+
+    # contains the key
+    if ($count -lt $Limit)
+    {
+        $results.Clone().Keys | ForEach-Object {
+            if ($_.Contains($Key)) {
+                $count++
+                $OrganisedResults += @{ 'Name' = $_; 'Version' = $results[$_]; }
+                $results.Remove($_)
+            }
+        }
+    }
+
+    # levenshtein for remaining packages
+    if ($count -lt $Limit)
+    {
+        $leven = @()
+
+        $results.Keys | ForEach-Object {
+            $leven += @{ 'Name' = $_; 'Version' = $results[$_]; 'Dist' = (Get-Levenshtein $Key $_) }
+        }
+
+        $leven | Sort-Object { $_.Dist } | ForEach-Object {
+            $OrganisedResults += @{ 'Name' = $_.name; 'Version' = $_.Version; }
+        }
+    }
+
+    return @($OrganisedResults)
+}
+
 
 # invokes fudge to search chocolatey for a package and display the results
 function Invoke-Search
@@ -1523,114 +1588,41 @@ function Invoke-Search
         $LocalList
     )
 
-    # basic validation on key and limit
-    if ([string]::IsNullOrWhiteSpace($Key))
-    {
+    # validate the key/package name supplied
+    if ([string]::IsNullOrWhiteSpace($Key)) {
         Write-Notice 'No search key provided'
         return
     }
 
-    if ($Limit -lt 0)
-    {
+    # validate the limit supplied
+    if ($Limit -lt 0) {
         Write-Notice "Limit for searching must be 0 or greater, found: $($Limit)"
         return
     }
 
     # get search results from chocolatey
-    $results = Get-ChocolateySearchList -Key $Key -Source $Source
-    $OrganisedResults = @()
-    $count = 0
-
-    # if limit is 0, set to total results returned
-    if ($Limit -eq 0)
-    {
-        $Limit = ($results | Measure-Object).Count
-    }
-
-    # perfect match
-    if ($results.ContainsKey($Key))
-    {
-        $count++
-        $OrganisedResults += @{'name' = $Key; 'version' = $results[$Key]; }
-        $results.Remove($Key)
-    }
-
-    # starts with (with added '.' for sub-packages)
-    if ($count -lt $Limit)
-    {
-        $results.Clone().Keys | ForEach-Object {
-            if ($_.StartsWith("$($Key)."))
-            {
-                $count++
-                $OrganisedResults += @{'name' = $_; 'version' = $results[$_]; }
-                $results.Remove($_)
-            }
-        }
-    }
-
-    # starts with
-    if ($count -lt $Limit)
-    {
-        $results.Clone().Keys | ForEach-Object {
-            if ($_.StartsWith($Key))
-            {
-                $count++
-                $OrganisedResults += @{'name' = $_; 'version' = $results[$_]; }
-                $results.Remove($_)
-            }
-        }
-    }
-
-    # contains
-    if ($count -lt $Limit)
-    {
-        $results.Clone().Keys | ForEach-Object {
-            if ($_.Contains($Key))
-            {
-                $count++
-                $OrganisedResults += @{'name' = $_; 'version' = $results[$_]; }
-                $results.Remove($_)
-            }
-        }
-    }
-
-    # levenshtein
-    if ($count -lt $Limit)
-    {
-        $leven = @()
-
-        $results.Keys | ForEach-Object {
-            $leven += @{'name' = $_; 'version' = $results[$_]; 'dist' = (Get-Levenshtein $Key $_) }
-        }
-
-        $leven | Sort-Object { $_.dist } | ForEach-Object {
-            $OrganisedResults += @{'name' = $_.name; 'version' = $_.version; }
-        }
-    }
+    $results = Format-ChocolateySearchResults -Key $Key -Limit $Limit -Source $Source
 
     # display the search results
-    $OrganisedResults | Select-Object -First $Limit | ForEach-Object {
-        if ($LocalList.ContainsKey($_.name))
+    $results | Select-Object -First $Limit | ForEach-Object {
+        if ($LocalList.ContainsKey($_.Name))
         {
-            ($_.version -imatch '^(?<version>[\d\.]+).*?$') | Out-Null
+            ($_.Version -imatch '^(?<version>[\d\.]+).*?$') | Out-Null
 
-            if ($Matches['version'] -eq $LocalList[$_.name])
-            {
-                Write-Success ("{0,-30} {1,-40} (installed: {2})" -f $_.name, $_.version, $LocalList[$_.name])
+            if ($Matches['version'] -eq $LocalList[$_.Name]) {
+                Write-Success ("{0,-30} {1,-40} (installed: {2})" -f $_.Name, $_.Version, $LocalList[$_.Name])
             }
-            else
-            {
-                Write-Notice ("{0,-30} {1,-40} (installed: {2})" -f $_.name, $_.version, $LocalList[$_.name])
+            else {
+                Write-Notice ("{0,-30} {1,-40} (installed: {2})" -f $_.Name, $_.Version, $LocalList[$_.Name])
             }
         }
-        else
-        {
-            Write-Host ("{0,-30} {1,-30}" -f $_.name, $_.version)
+        else {
+            Write-Host ("{0,-30} {1,-30}" -f $_.Name, $_.Version)
         }
     }
 
     # display the total
-    $total = ($OrganisedResults | Measure-Object).Count
+    $total = ($results | Measure-Object).Count
     Write-Notice "$($total) package(s) found"
 }
 
@@ -1661,13 +1653,11 @@ function Invoke-FudgeLocalDetails
     # package map
     $packages = @{}
 
-    if (!$DevOnly)
-    {
+    if (!$DevOnly) {
         $Config.packages | ForEach-Object { $packages[$_.name] = $_.version }
     }
 
-    if ($Dev)
-    {
+    if ($Dev) {
         $Config.devPackages | ForEach-Object { $packages[$_.name] = $_.version }
     }
 
@@ -1679,17 +1669,14 @@ function Invoke-FudgeLocalDetails
 
             if ($LocalList.ContainsKey($_))
             {
-                if ($LocalList[$_] -ieq $version -or (Test-VersionPassedIsLatest $version))
-                {
+                if ($LocalList[$_] -ieq $version -or (Test-VersionPassedIsLatest $version)) {
                     $installed[$_] = $version
                 }
-                else
-                {
+                else {
                     $updating[$_] = $version
                 }
             }
-            else
-            {
+            else {
                 $missing[$_] = $version
             }
         }
@@ -1707,35 +1694,60 @@ function Invoke-FudgeLocalDetails
     $missing.Keys | Sort-Object | ForEach-Object { Write-Fail ("{0,-30} {1,-20}" -f $_, $missing[$_]) }
 }
 
+function Get-ChocolateyLatestVersion
+{
+    param (
+        [Parameter()]
+        [string]
+        $Package,
+
+        [Parameter()]
+        [string]
+        $Source
+    )
+
+    $result = (Format-ChocolateySearchResults -Key $Package -Limit 1 -Source $Source | Select-Object -First 1)
+    if (!(Test-Empty $result)) {
+        return ($result.Version -split '\s+')[0]
+    }
+
+    return 'latest'
+}
 
 # invoke chocolate for the specific action
 function Invoke-Chocolatey
 {
     param (
+        [Parameter()]
         [string]
         $Action,
 
+        [Parameter()]
         [string]
         $Package,
 
+        [Parameter()]
         [string]
         $Version,
 
+        [Parameter()]
         [string]
         $Source,
 
+        [Parameter()]
         [string]
         $Parameters,
 
+        [Parameter()]
         [string]
         $Arguments,
 
+        [Parameter()]
         $LocalList
     )
 
     # if there was no package passed, return
-    if (Test-Empty $Package)
-    {
+    if (Test-Empty $Package) {
         return
     }
 
@@ -1745,13 +1757,25 @@ function Invoke-Chocolatey
     # set the parameters to pass
     $ParametersArg = Format-ChocolateyParams $Parameters
 
-    # set the version to pass
-    $VersionArg = Format-ChocolateyVersion $Version
+    # if the version is latest, attempt to get the real current version
+    if (Test-VersionPassedIsLatest -Version $Version) {
+        $latest = $true
+        $Version = Get-ChocolateyLatestVersion -Package $Package -Source $Source
+    }
+
     $Version = Format-SafeguardString $Version 'latest'
 
+    # build a version string, so if latest we can show the latest version
+    $VersionStr = "$($Version)"
+    if ($latest) {
+        $VersionStr = "latest [$($Version)]"
+    }
+
+    # set the version arg to pass
+    $VersionArg = Format-ChocolateyVersion $Version
+
     # if action is 'install', do we need to install, or upgrade/downgrade based on version?
-    if ($Action -ieq 'install' -and $LocalList -ne $null)
-    {
+    if (($Action -ieq 'install') -and ($null -ne $LocalList)) {
         $Action = Get-InstallAction -Package $Package -Version $Version -LocalList $LocalList
     }
 
@@ -1760,19 +1784,19 @@ function Invoke-Chocolatey
     {
         'install'
             {
-                Write-Information "> Installing $($Package) ($($Version))" -NoNewLine
+                Write-Information "> Installing $($Package) ($($VersionStr))" -NoNewLine
                 $output = Invoke-Expression "choco install $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments)"
             }
 
         'upgrade'
             {
-                Write-Information "> Upgrading $($Package) to ($($Version))" -NoNewLine
+                Write-Information "> Upgrading $($Package) to ($($VersionStr))" -NoNewLine
                 $output = Invoke-Expression "choco upgrade $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments)"
             }
 
         'downgrade'
             {
-                Write-Information "> Downgrading $($Package) to ($($Version))" -NoNewLine
+                Write-Information "> Downgrading $($Package) to ($($VersionStr))" -NoNewLine
                 $output = Invoke-Expression "choco upgrade $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments) --allow-downgrade"
             }
 
@@ -1788,18 +1812,17 @@ function Invoke-Chocolatey
                 $path = Split-Path -Parent -Path $Version
                 $name = Split-Path -Leaf -Path $Version
 
-                try
-                {
+                try {
                     Push-Location $path
                     $output = Invoke-Expression "choco pack $($name) $($Arguments)"
                 }
-                finally
-                {
+                finally {
                     Pop-Location
                 }
             }
     }
 
+    # determine if we failed, or if the exit code indicates a reboot is needed
     $lastcode = $LASTEXITCODE
     if (!$? -or ($lastcode -ne 0 -and $lastcode -ne 3010))
     {
@@ -1819,8 +1842,7 @@ function Invoke-Chocolatey
                 }
         }
 
-        if ($fail)
-        {
+        if ($fail) {
             Write-Fail " > failed"
             Write-Notice "`n`n$($output)`n"
             throw "Failed to $($Action) package: $($Package)"
@@ -1834,8 +1856,7 @@ function Invoke-Chocolatey
         Write-Success " > $($actionVerb)" -NoNewLine
         Write-Notice " > Reboot Required"
     }
-    else
-    {
+    else {
         Write-Success " > $($actionVerb)"
     }
 }

@@ -429,7 +429,6 @@ Describe 'Get-FudgefileContent' {
             Assert-MockCalled Test-Path -Times 1 -Scope It -ModuleName FudgeTools
             Assert-MockCalled Get-Content -Times 1 -Scope It -ModuleName FudgeTools
         }
-        
 
         It 'Should pass because content is valid JSON' {
             Mock Test-Path { return $true } -ModuleName FudgeTools

@@ -174,7 +174,7 @@ $ErrorActionPreference = 'Stop'
 
 # Import required modules
 $root = Split-Path -Parent -Path $MyInvocation.MyCommand.Path
-Import-Module "$($root)\Modules\FudgeTools.psm1" -ErrorAction Stop
+Import-Module "$($root)\Modules\FudgeTools.psm1" -Force -ErrorAction Stop
 
 
 # output the version
@@ -216,8 +216,7 @@ try
     $alterActions = @('delete', 'renew')
 
     $actions = ($packageActions + $maintainActions + $packingActions + $miscActions + $newActions + $alterActions)
-    if ((Test-Empty $Action) -or $actions -inotcontains $Action)
-    {
+    if ((Test-Empty $Action) -or $actions -inotcontains $Action) {
         Write-Fail "Unrecognised action supplied '$($Action)', should be either: $($actions -join ', ')"
         return
     }
@@ -225,30 +224,26 @@ try
 
     # actions that require chocolatey
     $isChocoAction = (@('which', 'add', 'remove', 'delete') -inotcontains $Action)
-    if (!$isChocoAction -and ($Install -or $Uninstall))
-    {
+    if (!$isChocoAction -and ($Install -or $Uninstall)) {
         $isChocoAction = $true
     }
 
 
     # if adhoc was supplied for an invalid action
-    if ($Adhoc -and @('install', 'uninstall', 'upgrade', 'downgrade', 'reinstall') -inotcontains $Action)
-    {
+    if ($Adhoc -and @('install', 'uninstall', 'upgrade', 'downgrade', 'reinstall') -inotcontains $Action) {
         Write-Fail "Adhoc supplied for invalid action: $($Action)"
         return
     }
 
-    # if adhoc supplied with no key, fail
-    if ($Adhoc -and [string]::IsNullOrWhiteSpace($Key))
-    {
+    # if adhoc supplied with no package name, fail
+    if ($Adhoc -and [string]::IsNullOrWhiteSpace($Key)) {
         Write-Fail "No package name supplied for adhoc $($Action)"
         return
     }
 
 
     # if -devOnly is passed, set -dev to true
-    if ($DevOnly)
-    {
+    if ($DevOnly) {
         $Dev = $true
     }
 
@@ -260,13 +255,11 @@ try
     # ensure that the Fudgefile exists (for certain actions), and deserialise it
     if (($packageActions + $maintainActions + $packingActions + $alterActions) -icontains $Action)
     {
-        # if adhoc is supplied, we don't need to get the content
         $config = $null
 
-        if (!$Adhoc)
-        {
-            if (!(Test-Path $FudgefilePath))
-            {
+        # if adhoc is supplied, we don't need to get the content
+        if (!$Adhoc) {
+            if (!(Test-Path $FudgefilePath)) {
                 Write-Fail "Path to Fudgefile does not exist: $($FudgefilePath)"
                 return
             }
@@ -275,8 +268,7 @@ try
         }
 
         # if we have a custom source in the config and no CLI source, set the source
-        if ((Test-Empty $Source) -and $config -ne $null -and !(Test-Empty $config.source))
-        {
+        if ((Test-Empty $Source) -and ($null -ne $config) -and !(Test-Empty $config.source)) {
             $Source = $config.source
         }
     }
@@ -284,8 +276,7 @@ try
     # ensure that the Fudgefile doesn't exist
     elseif ($newActions -icontains $Action)
     {
-        if (Test-Path $FudgefilePath)
-        {
+        if (Test-Path $FudgefilePath) {
             Write-Fail "Path to Fudgefile already exists: $($FudgefilePath)"
             return
         }
@@ -293,32 +284,31 @@ try
 
 
     # if there are no packages to install or nuspecs to pack, just return
-    if ($config -ne $null)
+    if ($null -ne $config)
     {
+        # check nuspecs
         if ($packingActions -icontains $Action)
         {
-            if (Test-Empty $config.pack)
-            {
+            if (Test-Empty $config.pack) {
                 Write-Notice "There are no nuspecs to $($Action)"
                 return
             }
 
-            if (![string]::IsNullOrWhiteSpace($Key) -and [string]::IsNullOrWhiteSpace($config.pack.$Key))
-            {
+            if (![string]::IsNullOrWhiteSpace($Key) -and [string]::IsNullOrWhiteSpace($config.pack.$Key)) {
                 Write-Notice "Fudgefile does not contain a nuspec pack file for '$($Key)'"
                 return
             }
         }
+
+        # check packages
         elseif ($packageActions -icontains $Action)
         {
-            if ((Test-Empty $config.packages) -and (!$Dev -or ($Dev -and (Test-Empty $config.devPackages))))
-            {
+            if ((Test-Empty $config.packages) -and (!$Dev -or ($Dev -and (Test-Empty $config.devPackages)))) {
                 Write-Notice "There are no packages to $($Action)"
                 return
             }
 
-            if ($DevOnly -and (Test-Empty $config.devPackages))
-            {
+            if ($DevOnly -and (Test-Empty $config.devPackages)) {
                 Write-Notice "There are no devPackages to $($Action)"
                 return
             }
@@ -327,8 +317,7 @@ try
 
 
     # check to see if chocolatey is installed
-    if ($isChocoAction)
-    {
+    if ($isChocoAction) {
         $isChocoInstalled = Test-Chocolatey
     }
 
@@ -345,15 +334,13 @@ try
 
 
     # if chocolatey isn't installed, install it
-    if (!$isChocoInstalled -and $isChocoAction)
-    {
+    if (!$isChocoInstalled -and $isChocoAction) {
         Install-Chocolatey
     }
 
 
     # if we are using a global custom source, output it for info
-    if (!(Test-Empty $Source))
-    {
+    if (!(Test-Empty $Source)) {
         Write-Notice "Source: $($Source)"
     }
 
@@ -361,8 +348,7 @@ try
 
 
     # retrieve a local list of what's currently installed
-    if ($isChocoAction)
-    {
+    if ($isChocoAction) {
         $localList = Get-ChocolateyLocalList
     }
 
@@ -456,6 +442,7 @@ try
 }
 finally
 {
+    # output duration, and cleanup
     Write-Details "`nDuration: $(([DateTime]::UtcNow - $timer).ToString())"
     Remove-Module -Name 'FudgeTools' -ErrorAction SilentlyContinue | Out-Null
 }
