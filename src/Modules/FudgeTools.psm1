@@ -1779,74 +1779,100 @@ function Invoke-Chocolatey
         $Action = Get-InstallAction -Package $Package -Version $Version -LocalList $LocalList
     }
 
-    # run chocolatey for appropriate action
-    switch ($Action.ToLowerInvariant())
+    # attempt 3 times - mostly do to help prevent timeouts
+    foreach ($i in 1..3)
     {
-        'install'
-            {
-                Write-Information "> Installing $($Package) ($($VersionStr))" -NoNewLine
-                $output = Invoke-Expression "choco install $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments)"
-            }
+        $success = $true
 
-        'upgrade'
-            {
-                Write-Information "> Upgrading $($Package) to ($($VersionStr))" -NoNewLine
-                $output = Invoke-Expression "choco upgrade $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments)"
-            }
-
-        'downgrade'
-            {
-                Write-Information "> Downgrading $($Package) to ($($VersionStr))" -NoNewLine
-                $output = Invoke-Expression "choco upgrade $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments) --allow-downgrade"
-            }
-
-        'uninstall'
-            {
-                Write-Information "> Uninstalling $($Package)" -NoNewLine
-                $output = Invoke-Expression "choco uninstall $($Package) -y -x $($ParametersArg) $($Arguments)"
-            }
-
-        'pack'
-            {
-                Write-Information "> Packing $($Package)" -NoNewLine
-                $path = Split-Path -Parent -Path $Version
-                $name = Split-Path -Leaf -Path $Version
-
-                try {
-                    Push-Location $path
-                    $output = Invoke-Expression "choco pack $($name) $($Arguments)"
+        # run chocolatey for appropriate action
+        switch ($Action.ToLowerInvariant())
+        {
+            'install'
+                {
+                    if ($i -eq 1) {
+                        Write-Information "> Installing $($Package) ($($VersionStr))" -NoNewLine
+                    }
+                    $output = Invoke-Expression "choco install $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments)"
                 }
-                finally {
-                    Pop-Location
+
+            'upgrade'
+                {
+                    if ($i -eq 1) {
+                        Write-Information "> Upgrading $($Package) to ($($VersionStr))" -NoNewLine
+                    }
+                    $output = Invoke-Expression "choco upgrade $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments)"
                 }
+
+            'downgrade'
+                {
+                    if ($i -eq 1) {
+                        Write-Information "> Downgrading $($Package) to ($($VersionStr))" -NoNewLine
+                    }
+                    $output = Invoke-Expression "choco upgrade $($Package) $($VersionArg) -y $($SourceArg) $($ParametersArg) $($Arguments) --allow-downgrade"
+                }
+
+            'uninstall'
+                {
+                    if ($i -eq 1) {
+                        Write-Information "> Uninstalling $($Package)" -NoNewLine
+                    }
+                    $output = Invoke-Expression "choco uninstall $($Package) -y -x $($ParametersArg) $($Arguments)"
+                }
+
+            'pack'
+                {
+                    Write-Information "> Packing $($Package)" -NoNewLine
+                    $path = Split-Path -Parent -Path $Version
+                    $name = Split-Path -Leaf -Path $Version
+
+                    try {
+                        Push-Location $path
+                        $output = Invoke-Expression "choco pack $($name) $($Arguments)"
+                    }
+                    finally {
+                        Pop-Location
+                    }
+                }
+        }
+
+        # determine if we failed, or if the exit code indicates a reboot is needed,
+        # or we've timed out and need to try
+        $lastcode = $LASTEXITCODE
+        if (!$? -or (@(0, 3010) -notcontains $lastcode))
+        {
+            # flag as failure
+            $success = $false
+
+            # check if the package timed-out, so we can retry again
+            if ($output -ilike '*the operation has timed out*') {
+                Start-Sleep -Seconds 5
+                continue
             }
+
+            # double check that the error isn't a false positive
+            switch ($Action)
+            {
+                {($_ -ieq 'uninstall')}
+                    {
+                        $success = ($output -ilike '*has been successfully uninstalled*' -or $output -ilike '*Cannot uninstall a non-existent package*')
+                    }
+
+                {($_ -ieq 'install') -or ($_ -ieq 'upgrade') -or ($_ -ieq 'downgrade')}
+                    {
+                        $success = ($output -ilike '*has been successfully installed*' -or $output -ilike '*has been installed*')
+                    }
+            }
+        }
+
+        # if we get here, break out
+        break
     }
 
-    # determine if we failed, or if the exit code indicates a reboot is needed
-    $lastcode = $LASTEXITCODE
-    if (!$? -or ($lastcode -ne 0 -and $lastcode -ne 3010))
-    {
-        $fail = $true
-
-        # double check that the error isn't a false positive
-        switch ($Action)
-        {
-            {($_ -ieq 'uninstall')}
-                {
-                    $fail = !($output -ilike '*has been successfully uninstalled*' -or $output -ilike '*Cannot uninstall a non-existent package*')
-                }
-
-            {($_ -ieq 'install') -or ($_ -ieq 'upgrade') -or ($_ -ieq 'downgrade')}
-                {
-                    $fail = !($output -ilike '*has been successfully installed*' -or $output -ilike '*has been installed*')
-                }
-        }
-
-        if ($fail) {
-            Write-Fail " > failed"
-            Write-Notice "`n`n$($output)`n"
-            throw "Failed to $($Action) package: $($Package)"
-        }
+    # if not successful, output the error details
+    if (!$success) {
+        Write-Fail " > failed"
+        Write-Notice "`n`n$($output)`n"
+        throw "Failed to $($Action) package: $($Package)"
     }
 
     $actionVerb = ("$($Action)ed" -ireplace 'eed$', 'ed')
