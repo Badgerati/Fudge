@@ -328,7 +328,7 @@ try
 
     if (((!$isChocoInstalled -and $isChocoAction) -or $isAdminAction -or $actionNeedsAdmin) -and !(Test-AdminUser))
     {
-        Write-Notice 'Must be running with administrator priviledges for Fudge to fully function'
+        Write-Notice 'Must be running with administrator privileges for Fudge to fully function'
         return
     }
 
