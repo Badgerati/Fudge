@@ -792,7 +792,7 @@ function Add-PackagesFromNuspec
 }
 
 
-# checks to see if the user has administrator priviledges
+# checks to see if the user has administrator privileges
 function Test-AdminUser
 {
     try
@@ -808,7 +808,7 @@ function Test-AdminUser
     }
     catch [exception]
     {
-        Write-Fail 'Error checking user administrator priviledges'
+        Write-Fail 'Error checking user administrator privileges'
         Write-Fail $_.Exception.Message
         return $false
     }
