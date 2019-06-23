@@ -795,6 +795,12 @@ function Add-PackagesFromNuspec
 # checks to see if the user has administrator privileges
 function Test-AdminUser
 {
+    if ($PSVersionTable.Platform -ieq 'Unix')
+    {
+        Write-Notice 'Windows Admin check bypassed on Unix'
+        return $true
+    }
+
     try
     {
         $principal = New-Object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
