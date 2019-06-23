@@ -323,7 +323,7 @@ try
 
 
     # check if the console is elevated (only needs to be done for certain actions)
-    $isAdminAction = @('list', 'search', 'new', 'delete', 'renew', 'which', 'add', 'remove') -inotcontains $Action
+    $isAdminAction = @('list', 'search', 'new', 'delete', 'renew', 'which', 'add', 'remove', 'pack') -inotcontains $Action
     $actionNeedsAdmin = (@('delete', 'remove') -icontains $Action -and $Uninstall) -or (@('new', 'renew', 'add') -icontains $Action -and $Install)
 
     if (((!$isChocoInstalled -and $isChocoAction) -or $isAdminAction -or $actionNeedsAdmin) -and !(Test-AdminUser))
