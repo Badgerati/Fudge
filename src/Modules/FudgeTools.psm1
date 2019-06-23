@@ -1763,6 +1763,8 @@ function Invoke-Chocolatey
     # set the parameters to pass
     $ParametersArg = Format-ChocolateyParams $Parameters
 
+    $Arguments += ' --allow-unofficial'
+
     # if the version is latest, attempt to get the real current version
     $latest = Test-VersionPassedIsLatest -Version $Version
     if ($latest) {
