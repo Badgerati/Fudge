@@ -1758,8 +1758,8 @@ function Invoke-Chocolatey
     $ParametersArg = Format-ChocolateyParams $Parameters
 
     # if the version is latest, attempt to get the real current version
-    if (Test-VersionPassedIsLatest -Version $Version) {
-        $latest = $true
+    $latest = Test-VersionPassedIsLatest -Version $Version
+    if ($latest) {
         $Version = Get-ChocolateyLatestVersion -Package $Package -Source $Source
     }
 
