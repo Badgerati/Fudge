@@ -1715,6 +1715,32 @@ function Get-ChocolateyLatestVersion
     return 'latest'
 }
 
+function Get-EnvironmentVariable
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]
+        $Name,
+
+        [Parameter(Mandatory=$true)]
+        [string]
+        $Scope
+    )
+
+    return [System.Environment]::GetEnvironmentVariable($Name, $Scope)
+}
+
+function Get-EnvironmentVariables
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]
+        $Scope
+    )
+
+    return ([System.Environment]::GetEnvironmentVariables($Scope)).Keys
+}
+
 function Update-EnvironmentPath
 {
     # get items in current path
@@ -1722,7 +1748,7 @@ function Update-EnvironmentPath
 
     # add new items from paths
     @('Machine', 'User') | ForEach-Object {
-        @(([System.Environment]::GetEnvironmentVariable('PATH', $_)) -split ';') | Select-Object -Unique | ForEach-Object {
+        @((Get-EnvironmentVariable -Name 'PATH' -Scope $_) -split ';') | Select-Object -Unique | ForEach-Object {
             if ($items -inotcontains $_) {
                 $items += $_
             }
@@ -1735,8 +1761,8 @@ function Update-EnvironmentPath
 function Update-EnvironmentVariables
 {
     foreach ($scope in @('Process', 'Machine', 'User')) {
-        foreach ($var in [System.Environment]::GetEnvironmentVariables($scope)) {
-            Set-Item "Env:$($var)" -Value ([System.Environment]::GetEnvironmentVariable($var, $scope)) -Force
+        foreach ($var in (Get-EnvironmentVariables -Scope $scope)) {
+            Set-Item "Env:$($var)" -Value (Get-EnvironmentVariable -Name $var -Scope $scope) -Force
         }
     }
 }
