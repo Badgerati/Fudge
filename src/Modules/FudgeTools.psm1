@@ -113,7 +113,7 @@ function Compare-Versions
         if ($i_parts[$i] -eq $o_parts[$i]) {
             continue
         }
-        
+
         if ($i_parts[$i] -lt $o_parts[$i]) {
             return -1
         }
@@ -223,12 +223,12 @@ function Get-Levenshtein
             {
                 $cost = 0
             }
-            
+
             $tempmin = [System.Math]::Min(([int]$dist[($i - 1), $j] + 1), ([int]$dist[$i, ($j - 1)] + 1))
             $dist[$i, $j] = [System.Math]::Min($tempmin, ([int]$dist[($i - 1), ($j - 1)] + $cost))
         }
     }
-    
+
     # the actual distance is stored in the bottom right cell
     return $dist[$len1, $len2];
 }
@@ -583,7 +583,7 @@ function Restore-Fudgefile
     {
         $content.devPackages = @()
     }
-    
+
     # insert packages from any nuspecs in the pack section
     if ($Key -ieq 'nuspec')
     {
@@ -623,7 +623,7 @@ function New-Fudgefile
 
         [string]
         $Key,
-        
+
         $LocalList,
 
         [switch]
