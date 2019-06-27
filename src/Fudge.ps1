@@ -1,7 +1,7 @@
 <#
     .SYNOPSIS
         Fudge is a tool to help you manage and version control Chocolatey packages required for environments to function
-    
+
     .DESCRIPTION
         Fudge is a tool to help you manage and version control Chocolatey packages required for environments to function.
         This is done via a Fudgefile which allows you to specify packages (and their versions) to install. You can also
@@ -10,7 +10,7 @@
         You are also able to define pre/post install/upgrade/downgrade/uninstall scripts for additional required functionality
 
         Furthermore, Fudge has a section to allow you to specify multiple nuspec files and pack the one you need
-    
+
     .PARAMETER Action
         The action that Fudge should undertake
         Actions: install, upgrade, downgrade, uninstall, reinstall, pack, list, search, new, delete, prune, clean, rebuild,
@@ -21,7 +21,7 @@
         The key represents a package/nuspec name in the Fudgefile
         [Actions: install, upgrade, downgrade, uninstall, reinstall, pack, new, which, renew, add, remove]
         [Alias: -k]
-    
+
     .PARAMETER FudgefilePath
         This will override looking for a default 'Fudgefile' at the root of the current path, and allow you to specify
         other files instead. This allows you to have multiple Fudgefiles
@@ -72,22 +72,22 @@
         Switch parameter, if supplied will install packages after creating a new Fudgefile
         [Actions: new, renew, add]
         [Alias: -i]
-    
+
     .PARAMETER Uninstall
         Switch parameter, if supplied will uninstall packages before deleting a Fudgefile
         [Actions: delete, renew, remove]
         [Alias: -u]
-    
+
     .PARAMETER Adhoc
         Switch parameter, if supplied will install software from Chocolatey whether or not
         the package is in the Fudgefile
         [Actions: install, upgrade, downgrade, uninstall, reinstall]
         [Alias: -ad]
-    
+
     .PARAMETER Version
         Switch parameter, if supplied will just display the current version of Fudge installed
         [Alias: -v]
-    
+
     .PARAMETER Help
         Switch parameter, if supplied will just display help output
         [Alias: -h]
@@ -100,7 +100,7 @@
 
     .EXAMPLE
         fudge install git -ad   # installs git dispite not being in the Fudgefile
-    
+
     .EXAMPLE
         fudge pack website
 
@@ -118,7 +118,7 @@ param (
     [Alias('k')]
     [string]
     $Key,
-    
+
     [Alias('fp')]
     [string]
     $FudgefilePath,
