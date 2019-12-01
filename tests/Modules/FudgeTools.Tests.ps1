@@ -965,3 +965,115 @@ Describe 'Format-ChocolateyList' {
         }
     }
 }
+
+Describe 'Update-EnvironmentPath' {
+    It 'Only adds a new entry to the PATH' {
+        Mock Get-EnvironmentVariable { return 'fudge-test-path' } -ModuleName FudgeTools
+        $itemsPre = @($env:PATH -split ';')
+        Update-EnvironmentPath
+        $itemsPost = @($env:PATH -split ';')
+        ($itemsPost -icontains $itemsPre[0]) | Should Be $true
+        ($itemsPost -icontains 'fudge-test-path') | Should Be $true
+    }
+}
+
+Describe 'Update-EnvironmentVariables' {
+    It 'Adds a new Process environtment variable' {
+        [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Process')
+
+        try {
+            $env:FUDGE_TEST_VAR | Should Be $null
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', 'test', 'Process')
+            $env:FUDGE_TEST_VAR | Should Be 'test'
+            Update-EnvironmentVariables
+            $env:FUDGE_TEST_VAR | Should Be 'test'
+        }
+        finally {
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Process')
+        }
+    }
+
+    It 'Adds a new Machine environtment variable' {
+        [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Process')
+
+        try {
+            $env:FUDGE_TEST_VAR | Should Be $null
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', 'test', 'Machine')
+            $env:FUDGE_TEST_VAR | Should Be $null
+            Update-EnvironmentVariables
+            $env:FUDGE_TEST_VAR | Should Be 'test'
+        }
+        finally {
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Machine')
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Process')
+        }
+    }
+
+    It 'Adds a new User environtment variable' {
+        [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Process')
+
+        try {
+            $env:FUDGE_TEST_VAR | Should Be $null
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', 'test', 'User')
+            $env:FUDGE_TEST_VAR | Should Be $null
+            Update-EnvironmentVariables
+            $env:FUDGE_TEST_VAR | Should Be 'test'
+        }
+        finally {
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'User')
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Process')
+        }
+    }
+
+    It 'Adds a Process variable, then overrides with Machine' {
+        [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Process')
+
+        try {
+            $env:FUDGE_TEST_VAR | Should Be $null
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', 'test', 'Process')
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', 'test2', 'Machine')
+            $env:FUDGE_TEST_VAR | Should Be 'test'
+            Update-EnvironmentVariables
+            $env:FUDGE_TEST_VAR | Should Be 'test2'
+        }
+        finally {
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Process')
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Machine')
+        }
+    }
+
+    It 'Adds a Process variable, then overrides with User' {
+        [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Process')
+
+        try {
+            $env:FUDGE_TEST_VAR | Should Be $null
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', 'test', 'Process')
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', 'test2', 'User')
+            $env:FUDGE_TEST_VAR | Should Be 'test'
+            Update-EnvironmentVariables
+            $env:FUDGE_TEST_VAR | Should Be 'test2'
+        }
+        finally {
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Process')
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'User')
+        }
+    }
+
+    It 'Adds a Machine variable, then overrides with User' {
+        [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Process')
+
+        try {
+            $env:FUDGE_TEST_VAR | Should Be $null
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', 'test', 'Machine')
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', 'test2', 'User')
+            $env:FUDGE_TEST_VAR | Should Be $null
+            Update-EnvironmentVariables
+            $env:FUDGE_TEST_VAR | Should Be 'test2'
+        }
+        finally {
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Process')
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'Machine')
+            [System.Environment]::SetEnvironmentVariable('FUDGE_TEST_VAR', '', 'User')
+        }
+    }
+}

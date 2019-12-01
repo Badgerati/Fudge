@@ -1363,21 +1363,22 @@ function Invoke-FudgeWhich
         $Key
     )
 
-    if (Test-Empty $Key)
-    {
+    # do nothing if no command passed
+    if (Test-Empty $Key) {
         Write-Notice 'No command passed to find'
+        return
     }
-    else
-    {
-        $path = (Get-Command -Name $Key -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Definition)
-        if (!(Test-Empty $path))
-        {
-            Write-Host "> $($path)"
-        }
-        else
-        {
-            Write-Notice "Command not found: $($Key)"
-        }
+
+    # refresh the path
+    Update-FudgeEnvironmentPath
+
+    # attempt to get the commands path
+    $path = (Get-Command -Name $Key -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Definition)
+    if (!(Test-Empty $path)) {
+        Write-Host "> $($path)"
+    }
+    else {
+        Write-Notice "Command not found: $($Key)"
     }
 }
 
@@ -1720,6 +1721,58 @@ function Get-ChocolateyLatestVersion
     return 'latest'
 }
 
+function Get-EnvironmentVariable
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]
+        $Name,
+
+        [Parameter(Mandatory=$true)]
+        [string]
+        $Scope
+    )
+
+    return [System.Environment]::GetEnvironmentVariable($Name, $Scope)
+}
+
+function Get-EnvironmentVariables
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]
+        $Scope
+    )
+
+    return ([System.Environment]::GetEnvironmentVariables($Scope)).Keys
+}
+
+function Update-EnvironmentPath
+{
+    # get items in current path
+    $items = @(@($env:PATH -split ';') | Select-Object -Unique)
+
+    # add new items from paths
+    @('Machine', 'User') | ForEach-Object {
+        @((Get-EnvironmentVariable -Name 'PATH' -Scope $_) -split ';') | Select-Object -Unique | ForEach-Object {
+            if ($items -inotcontains $_) {
+                $items += $_
+            }
+        }
+    }
+
+    $env:PATH = ($items -join ';')
+}
+
+function Update-EnvironmentVariables
+{
+    foreach ($scope in @('Process', 'Machine', 'User')) {
+        foreach ($var in (Get-EnvironmentVariables -Scope $scope)) {
+            Set-Item "Env:$($var)" -Value (Get-EnvironmentVariable -Name $var -Scope $scope) -Force
+        }
+    }
+}
+
 # invoke chocolate for the specific action
 function Invoke-Chocolatey
 {
@@ -1883,6 +1936,7 @@ function Invoke-Chocolatey
         throw "Failed to $($Action) package: $($Package)"
     }
 
+    # output for success
     $actionVerb = ("$($Action)ed" -ireplace 'eed$', 'ed')
 
     if ($output -ilike '*exit code 3010*' -or $lastcode -eq 3010)
@@ -1893,4 +1947,8 @@ function Invoke-Chocolatey
     else {
         Write-Success " > $($actionVerb)"
     }
+
+    # refresh the environment
+    Update-FudgeEnvironmentVariables
+    Update-FudgeEnvironmentPath
 }
