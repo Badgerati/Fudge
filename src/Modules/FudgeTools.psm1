@@ -1370,7 +1370,7 @@ function Invoke-FudgeWhich
     }
 
     # refresh the path
-    Update-FudgeEnvironmentPath
+    Update-EnvironmentPath
 
     # attempt to get the commands path
     $path = (Get-Command -Name $Key -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Definition)
@@ -1949,6 +1949,6 @@ function Invoke-Chocolatey
     }
 
     # refresh the environment
-    Update-FudgeEnvironmentVariables
-    Update-FudgeEnvironmentPath
+    Update-EnvironmentVariables
+    Update-EnvironmentPath
 }
